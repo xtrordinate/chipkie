@@ -1,0 +1,4 @@
+ARG LOCAL_BASE_IMAGE=""
+FROM $LOCAL_BASE_IMAGE
+USER 9001
+CMD php artisan queue:work

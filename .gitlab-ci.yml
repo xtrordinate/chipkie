@@ -1,0 +1,98 @@
+---
+variables:
+  SSH_HOST: 103.242.49.13
+  SSH_DEST: sol1@103.242.49.13
+
+stages:
+  - build
+  - deploy_staging
+  - deploy_production
+
+docker-build:
+  stage: build
+  image: docker:20
+  only:
+    refs:
+      - staging
+      - production
+  tags:
+    - dind
+    - akimbo
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+
+  script:
+    # Default branch uses latest tag, otherwise the branch name (commit ref slug)
+    - |
+      if [[ "$CI_COMMIT_BRANCH" == "$CI_DEFAULT_BRANCH" ]]; then
+        tag="latest"
+      else
+        tag="$CI_COMMIT_REF_SLUG"
+      fi
+
+    # Build main app image e.g. gitlab.sol1.net:5050/chipkie1/chipkie-website:staging
+    - IMAGE=$(echo "${CI_REGISTRY}/${CI_PROJECT_PATH}:${tag}" | tr '[:upper:]' '[:lower:]')
+    - LOCAL_BASE_IMAGE="chipkie-app:${tag}"
+    - docker build --pull -t "$IMAGE" .
+
+    # So we can inherit from this local tag in the other Dockerfiles below
+    - echo "Adding local build tag $LOCAL_BASE_IMAGE" && docker tag "$IMAGE" "$LOCAL_BASE_IMAGE"
+    - docker push "$IMAGE"
+
+    # Build worker image e.g. gitlab.sol1.net:5050/chipkie1/chipkie-website/worker:production
+    - IMAGE=$(echo "${CI_REGISTRY}/${CI_PROJECT_PATH}/worker:${tag}" | tr '[:upper:]' '[:lower:]')
+    - docker build --build-arg LOCAL_BASE_IMAGE="$LOCAL_BASE_IMAGE" -t "$IMAGE" -f Dockerfile.worker .
+    - docker push "$IMAGE"
+    
+    # Build nginx image e.g. gitlab.sol1.net:5050/chipkie1/chipkie-website/webserver:staging
+    - IMAGE=$(echo "${CI_REGISTRY}/${CI_PROJECT_PATH}/webserver:${tag}" | tr '[:upper:]' '[:lower:]')
+    - docker build --build-arg LOCAL_BASE_IMAGE="$LOCAL_BASE_IMAGE" -t "$IMAGE" -f Dockerfile.webserver .
+    - docker push "$IMAGE"
+
+.setup_ssh: &setup_ssh
+  image: alpine
+  before_script:
+    - 'which ssh-agent || ( apk --update add openssh-client )'
+    - eval $(ssh-agent -s)
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && chmod 0700 ~/.ssh
+    - ssh-keyscan $SSH_HOST >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
+
+deploy_staging:
+  <<: *setup_ssh
+  stage: deploy_staging
+  only:
+    refs:
+      - staging # the Docker image is tagged as :staging and the docker-compose.yml relies on that
+  tags:
+    - sol1-hq
+  variables:
+    DIR: chipkie-staging
+    SLUG: staging
+  script:
+    - echo "$DOTENV_STAGING" > .env
+    - ssh $SSH_DEST "mkdir -p $DIR"
+    - scp .env deploy.sh $SSH_DEST:$DIR/
+    - scp docker-compose.$SLUG.yml $SSH_DEST:$DIR/docker-compose.yml
+    - ssh $SSH_DEST "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && cd $DIR && bash deploy.sh"
+
+deploy_production:
+  <<: *setup_ssh
+  stage: deploy_production
+  only:
+    refs:
+      - production # the Docker image is tagged as :production and the docker-compose.yml relies on that
+  tags:
+    - sol1-hq
+  variables:
+    DIR: chipkie
+    SLUG: production
+  script:
+    - echo "$DOTENV_PRODUCTION" > .env
+    - ssh $SSH_DEST "mkdir -p $DIR"
+    - scp .env deploy.sh $SSH_DEST:$DIR/
+    - scp docker-compose.$SLUG.yml $SSH_DEST:$DIR/docker-compose.yml
+    - ssh $SSH_DEST "docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY && cd $DIR && bash deploy.sh"

@@ -1,0 +1,53 @@
+services:
+  redis:
+    image: redis:alpine
+    restart: unless-stopped
+
+  mariadb:
+    image: mariadb:10.11
+    volumes:
+      - chipkie_db_data:/var/lib/mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=chipkie
+      - MYSQL_DATABASE=chipkie
+      - MYSQL_USER=chipkie
+      - MYSQL_PASSWORD=chipkie
+      - MARIADB_AUTO_UPGRADE=1
+    restart: unless-stopped
+
+  webserver:
+    image: gitlab.sol1.net:5050/chipkie1/chipkie-website/webserver:production
+    working_dir: /app
+    volumes:
+      - chipkie_app_storage:/app/storage
+    ports:
+      - "9033:80"
+    restart: unless-stopped
+
+  app:
+    image: gitlab.sol1.net:5050/chipkie1/chipkie-website:production
+    working_dir: /app
+    volumes:
+      - chipkie_app_storage:/app/storage
+      - ./.env:/app/.env
+    depends_on:
+      - redis
+      - mariadb
+    restart: unless-stopped
+
+  worker:
+    image: gitlab.sol1.net:5050/chipkie1/chipkie-website/worker:production
+    working_dir: /app
+    volumes:
+      - chipkie_app_storage:/app/storage
+      - ./.env:/app/.env
+    depends_on:
+      - redis
+      - mariadb
+    restart: unless-stopped
+
+volumes:
+  chipkie_db_data:
+    external: true
+  chipkie_app_storage:
+    external: true

@@ -1,0 +1,8 @@
+ARG LOCAL_BASE_IMAGE=""
+FROM $LOCAL_BASE_IMAGE as base
+FROM nginx:alpine
+WORKDIR /app
+COPY docker/nginx/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=base /app/public /app/public
+# Create a symlink to the Laravel storage folder
+RUN ln -sf /app/storage/app/public /app/public/storage

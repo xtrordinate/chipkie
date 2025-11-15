@@ -1,0 +1,11 @@
+/.env
+/node_modules/*
+/vendor/*
+/public/build/
+/bootstrap/ssr/
+public/hot
+public/storage
+.phpunit.result.cache
+.DS_Store
+/doc/*.dtmp
+docker/db-import/*

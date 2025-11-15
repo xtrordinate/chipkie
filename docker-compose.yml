@@ -1,0 +1,71 @@
+services:
+  redis:
+    image: redis:alpine
+    container_name: chipkie-redis
+    restart: unless-stopped
+
+  mariadb:
+    image: mariadb:10.11
+    container_name: chipkie-mariadb
+    volumes:
+      - chipkie_db_data:/var/lib/mysql
+      - ./docker/db-import:/docker-entrypoint-initdb.d
+    environment:
+      - MYSQL_ROOT_PASSWORD=chipkie
+      - MYSQL_DATABASE=chipkie
+      - MYSQL_USER=chipkie
+      - MYSQL_PASSWORD=chipkie
+      - MARIADB_AUTO_UPGRADE=1
+    ports:
+      - "9033:3306"
+    restart: unless-stopped
+
+  app:
+    container_name: chipkie-app
+    image: chipkie-app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    working_dir: /app
+    volumes:
+      - chipkie_app_storage:/app/storage
+      - .:/app
+    restart: unless-stopped
+
+  worker:
+    container_name: chipkie-worker
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+      args:
+        LOCAL_BASE_IMAGE: chipkie-app:latest
+    working_dir: /app
+    depends_on:
+      - app
+    volumes:
+      - chipkie_app_storage:/app/storage
+      - .:/app
+    restart: unless-stopped
+
+  webserver:
+    container_name: chipkie-webserver
+    build:
+      context: .
+      dockerfile: Dockerfile.webserver
+      args:
+        LOCAL_BASE_IMAGE: chipkie-app:latest
+    working_dir: /app
+    depends_on:
+      - app
+    volumes:
+      - chipkie_app_storage:/app/storage
+      - .:/app
+    ports:
+      - "9032:80"
+    restart: unless-stopped
+
+volumes:
+  chipkie_db_data:
+    external: true
+  chipkie_app_storage:
+    external: true
