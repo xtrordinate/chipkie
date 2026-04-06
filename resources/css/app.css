@@ -1,0 +1,15 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+    html, body, #app {
+        height: 100%;
+    }
+}
+
+@layer utilities {
+    .animate-bounce-dot {
+        animation: bounceDot 1.2s infinite;
+    }
+}
