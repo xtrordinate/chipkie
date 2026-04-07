@@ -54,18 +54,18 @@ COPY --chown=www-data:www-data . .
 # Copy built frontend assets from Stage 1
 COPY --from=assets --chown=www-data:www-data /app/public/build ./public/build
 
-# Install PHP dependencies (production)
-RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
-
-# Storage directories
+# Ensure storage/cache dirs exist before composer runs package:discover
 RUN mkdir -p \
-        storage/framework/cache \
+        storage/framework/cache/data \
         storage/framework/views \
         storage/framework/sessions \
         storage/logs \
         bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache \
     && chmod -R 775 storage bootstrap/cache
+
+# Install PHP dependencies (production)
+RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
 # nginx + supervisord config
 COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
