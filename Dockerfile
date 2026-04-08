@@ -76,7 +76,7 @@ RUN sed -i 's|^user = .*|user = www-data|' /usr/local/etc/php-fpm.d/www.conf \
     && sed -i 's|^group = .*|group = www-data|' /usr/local/etc/php-fpm.d/www.conf
 
 # PHP opcache config
-RUN echo "opcache.enable=1\nopcache.validate_timestamps=0\nopcache.memory_consumption=128\nopcache.max_accelerated_files=10000" \
+RUN printf "opcache.enable=1\nopcache.validate_timestamps=0\nopcache.memory_consumption=128\nopcache.max_accelerated_files=10000\n" \
     > /usr/local/etc/php/conf.d/opcache.ini
 
 EXPOSE 80
