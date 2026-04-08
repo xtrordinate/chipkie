@@ -75,9 +75,6 @@ COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 RUN sed -i 's|^user = .*|user = www-data|' /usr/local/etc/php-fpm.d/www.conf \
     && sed -i 's|^group = .*|group = www-data|' /usr/local/etc/php-fpm.d/www.conf
 
-# PHP opcache config
-COPY docker/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
-
 EXPOSE 80
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
