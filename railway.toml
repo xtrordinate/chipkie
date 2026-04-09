@@ -1,6 +1,6 @@
 [deploy]
 startCommand = "php artisan migrate --force; php artisan config:cache; php artisan storage:link; /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf"
-healthcheckPath = "/loans/chat"
+healthcheckPath = "/health.php"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
 
