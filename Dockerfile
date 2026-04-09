@@ -12,7 +12,6 @@ FROM php:8.3-fpm-alpine
 # System dependencies
 RUN apk add --no-cache \
     nginx \
-    supervisor \
     git \
     curl \
     zip \
@@ -67,14 +66,17 @@ RUN mkdir -p \
 # Install PHP dependencies (production)
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
-# nginx + supervisord config
+# nginx config
 COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
-COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # PHP-FPM: run as www-data, listen on 127.0.0.1:9000
 RUN sed -i 's|^user = .*|user = www-data|' /usr/local/etc/php-fpm.d/www.conf \
     && sed -i 's|^group = .*|group = www-data|' /usr/local/etc/php-fpm.d/www.conf
 
+# Startup script
+COPY docker/start.sh /start.sh
+RUN chmod +x /start.sh
+
 EXPOSE 80
 
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+CMD ["/start.sh"]
