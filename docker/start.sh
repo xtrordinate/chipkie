@@ -1,20 +1,27 @@
 #!/bin/sh
 
-echo "=== Container starting ==="
+# Railway injects $PORT - nginx must listen on it
+PORT=${PORT:-80}
 
-echo "=== Running migrations ==="
+echo "Starting on port $PORT"
+
+# Update nginx to listen on the correct port
+sed -i "s/listen 80 default_server/listen ${PORT} default_server/" /etc/nginx/http.d/default.conf
+
+# Ensure nginx log dirs exist
+mkdir -p /var/log/nginx /var/run
+
+# Run migrations
 php artisan migrate --force
-echo "=== Migrations done ==="
 
-echo "=== Caching config ==="
-php artisan config:cache || echo "config:cache failed"
+# Cache config and link storage (non-fatal)
+php artisan config:cache || true
+php artisan storage:link || true
 
-echo "=== Storage link ==="
-php artisan storage:link || echo "storage:link failed"
-
-echo "=== Starting php-fpm ==="
+# Start php-fpm as daemon
 php-fpm -D
-echo "=== php-fpm started (exit $?) ==="
 
-echo "=== Starting nginx ==="
+echo "php-fpm started, launching nginx on port $PORT..."
+
+# Start nginx in foreground (this keeps the container alive)
 exec nginx -g "daemon off;"

@@ -67,6 +67,7 @@ RUN mkdir -p \
 RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progress
 
 # nginx config
+COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
 
 # PHP-FPM: run as www-data, listen on 127.0.0.1:9000
