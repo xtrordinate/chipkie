@@ -1,5 +1,5 @@
 [deploy]
-startCommand = "php artisan migrate --force && /start.sh"
+startCommand = "/start.sh"
 healthcheckPath = "/health.php"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
