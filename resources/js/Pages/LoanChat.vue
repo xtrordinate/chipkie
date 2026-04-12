@@ -23,22 +23,17 @@
                     :key="i"
                     :class="msg.from === 'bot' ? 'flex items-end gap-2' : 'flex justify-end'"
                 >
-                    <!-- Bot avatar -->
                     <div
                         v-if="msg.from === 'bot'"
                         class="w-7 h-7 rounded-full bg-[#007c89] flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
                     >
                         C
                     </div>
-
-                    <!-- Bot bubble -->
                     <div
                         v-if="msg.from === 'bot'"
                         class="bg-white text-[#004053] rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[75%] shadow-sm text-sm leading-relaxed"
                         v-html="renderMarkdown(msg.text)"
                     />
-
-                    <!-- User bubble -->
                     <div
                         v-else
                         class="bg-[#007c89] text-white rounded-2xl rounded-br-sm px-4 py-2.5 max-w-[75%] shadow-sm text-sm leading-relaxed"
@@ -62,7 +57,7 @@
                 </div>
             </div>
 
-            <!-- Loan summary card (shown at confirmation step) -->
+            <!-- Loan summary card -->
             <Transition name="message">
                 <div v-if="showSummary" class="mx-1">
                     <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden text-sm">
@@ -82,15 +77,17 @@
                                 :label="answers.role === 'Lender' ? 'Borrower email' : 'Lender email'"
                                 :value="answers.otherEmail"
                             />
-                            <SummaryRow label="Repayment frequency" :value="answers.frequency" />
-                            <SummaryRow label="Number of repayments" :value="answers.instalments" />
                             <SummaryRow
-                                label="Repayment amount"
+                                label="Repayments"
+                                :value="`${answers.instalments} × ${answers.frequency?.toLowerCase()}`"
+                            />
+                            <SummaryRow
+                                label="Each repayment"
                                 :value="formatCurrency(repaymentAmount)"
                                 highlight
                             />
                             <SummaryRow
-                                label="Interest rate"
+                                label="Interest"
                                 :value="answers.interestRate === '0' ? 'Interest-free' : `${answers.interestRate}% p.a.`"
                             />
                         </div>
@@ -102,7 +99,6 @@
         <!-- Input area -->
         <div class="bg-white border-t border-gray-200 px-4 py-3 flex-shrink-0">
 
-            <!-- Validation error -->
             <p v-if="validationError" class="text-red-500 text-xs mb-2 px-1">
                 {{ validationError }}
             </p>
@@ -124,7 +120,7 @@
                 </button>
             </div>
 
-            <!-- Text / number / email input -->
+            <!-- Text / email input -->
             <div
                 v-else-if="currentStep && !isDone && !isSubmitted"
                 class="flex gap-2"
@@ -132,7 +128,7 @@
                 <input
                     ref="inputRef"
                     v-model="inputValue"
-                    :type="inputType"
+                    :type="currentStep.type === 'email' ? 'email' : 'text'"
                     :inputmode="currentStep.type === 'currency' || currentStep.type === 'number' ? 'decimal' : undefined"
                     :placeholder="currentStep.placeholder"
                     :disabled="isTyping"
@@ -156,6 +152,7 @@
             <!-- Confirm / Start over -->
             <div v-else-if="isDone && !isSubmitted" class="flex gap-2">
                 <button
+                    type="button"
                     @click="startOver"
                     class="flex-1 py-2.5 border border-gray-200 text-gray-500 rounded-full text-sm font-medium
                            hover:bg-gray-50 transition-colors"
@@ -163,6 +160,7 @@
                     Start over
                 </button>
                 <button
+                    type="button"
                     :disabled="isSubmitting"
                     @click="submitLoan"
                     class="flex-1 py-2.5 bg-[#007c89] text-white rounded-full text-sm font-semibold
@@ -174,10 +172,7 @@
 
             <!-- Post-submit -->
             <div v-else-if="isSubmitted" class="text-center py-1">
-                <a
-                    href="/"
-                    class="text-[#007c89] text-sm font-medium hover:underline"
-                >
+                <a href="/" class="text-[#007c89] text-sm font-medium hover:underline">
                     Go to dashboard &rarr;
                 </a>
             </div>
@@ -190,7 +185,7 @@
 import { ref, reactive, computed, nextTick, onMounted, defineComponent, h } from 'vue'
 import axios from 'axios'
 
-// ─── Summary row sub-component ───────────────────────────────────────────────
+// ─── Summary row sub-component ────────────────────────────────────────────────
 const SummaryRow = defineComponent({
     props: { label: String, value: [String, Number], highlight: Boolean },
     setup(props) {
@@ -205,12 +200,80 @@ const SummaryRow = defineComponent({
     },
 })
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function firstName(name) {
+    return (name || '').split(' ')[0]
+}
+
+function formatCurrencyRaw(val) {
+    if (!val && val !== 0) return '$0'
+    return '$' + Number(val).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
+}
+
+function formatCurrency(val) {
+    if (!val && val !== 0) return '—'
+    return '$' + Number(val).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function renderMarkdown(text) {
+    if (!text) return ''
+    return text
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/\n/g, '<br>')
+}
+
+/**
+ * Parse a human duration string like "3 months", "1 year", "2 weeks".
+ * Returns { value, unit } or null if unparseable.
+ */
+function parseDuration(str) {
+    if (!str) return null
+    const m = str.trim().toLowerCase().match(
+        /^(\d+(?:\.\d+)?)\s*(day|days|week|weeks|fortnight|fortnights|month|months|year|years)$/
+    )
+    if (!m) return null
+    return { value: parseFloat(m[1]), unit: m[2].replace(/s$/, '') }
+}
+
+/**
+ * Convert a human duration + repayment frequency into a number of instalments.
+ */
+function durationToInstalments(durationStr, frequency) {
+    const d = parseDuration(durationStr)
+    if (!d || !frequency) return 1
+    // Normalise to weeks
+    const weeksPerUnit = { day: 1 / 7, week: 1, fortnight: 2, month: 52 / 12, year: 52 }
+    const totalWeeks = d.value * (weeksPerUnit[d.unit] ?? 0)
+    const weeksPerPeriod = frequency === 'Weekly' ? 1 : frequency === 'Fortnightly' ? 2 : 52 / 12
+    return Math.max(1, Math.round(totalWeeks / weeksPerPeriod))
+}
+
+/**
+ * Calculate a single repayment amount given principal, instalments, rate, frequency.
+ */
+function calcRepaymentAmount(P, n, annualRate, frequency) {
+    if (!P || !n) return 0
+    if (!annualRate || annualRate === 0) return P / n
+    const periodsPerYear = frequency === 'Weekly' ? 52 : frequency === 'Fortnightly' ? 26 : 12
+    const r = (annualRate / 100) / periodsPerYear
+    return P * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1)
+}
+
 // ─── Conversation steps ───────────────────────────────────────────────────────
+// Each step can have:
+//   id, question(answers), type, field, placeholder, choices
+//   validate(value) → error string or null
+//   condition(answers) → bool  (if false, step is skipped automatically)
+//   onAnswer(value, answers)   (side-effects: compute derived fields)
+//   displayValue(value)        (how to show in the user's chat bubble)
 const STEPS = [
     {
         id: 'role',
         question: () =>
-            "Hi! I'm **Chipkie** — your personal loan assistant. Let's set up a loan between friends or family.\n\nAre you the **lender** (giving money) or the **borrower** (receiving money)?",
+            "Hi! I'm **Chipkie** — your personal loan assistant. " +
+            "Let's set up a loan between friends or family.\n\n" +
+            "Are you the **lender** (giving money) or the **borrower** (receiving money)?",
         type: 'choice',
         choices: ['Lender', 'Borrower'],
         field: 'role',
@@ -218,48 +281,61 @@ const STEPS = [
     {
         id: 'amount',
         question: (a) =>
-            `Got it, you're the **${a.role.toLowerCase()}**. How much money is this loan for? (enter just the number, e.g. 500)`,
+            `Got it, you're the **${a.role.toLowerCase()}**. How much is the loan for?`,
         type: 'currency',
         field: 'amount',
-        placeholder: 'e.g. 500',
-        validate: (v) => (!isNaN(v) && parseFloat(v) > 0) ? null : 'Please enter a valid amount greater than 0',
+        placeholder: 'e.g. 1000',
+        validate: (v) =>
+            !isNaN(v) && parseFloat(v) > 0
+                ? null
+                : 'Please enter a valid amount greater than 0',
+        displayValue: (v) => formatCurrencyRaw(v),
     },
     {
         id: 'yourName',
-        question: (a) =>
-            `A **${formatCurrencyRaw(a.amount)}** loan — nice! What's your full name?`,
+        question: () => "What's your full name?",
         type: 'text',
         field: 'yourName',
         placeholder: 'Your full name',
-        validate: (v) => v.trim().length >= 2 ? null : 'Please enter your full name',
+        validate: (v) =>
+            v.trim().length >= 2 ? null : 'Please enter your full name',
     },
     {
         id: 'yourEmail',
         question: (a) =>
-            `Nice to meet you, **${firstName(a.yourName)}**! What's your email address?`,
+            `Nice to meet you, **${firstName(a.yourName)}**! And your email address?`,
         type: 'email',
         field: 'yourEmail',
         placeholder: 'you@example.com',
-        validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : 'Please enter a valid email address',
+        validate: (v) =>
+            /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+                ? null
+                : 'Please enter a valid email address',
     },
     {
         id: 'otherName',
-        question: (a) => a.role === 'Lender'
-            ? `Who are you lending **${formatCurrencyRaw(a.amount)}** to? What's their full name?`
-            : `Who are you borrowing **${formatCurrencyRaw(a.amount)}** from? What's their full name?`,
+        question: (a) =>
+            a.role === 'Lender'
+                ? `Who are you lending **${formatCurrencyRaw(a.amount)}** to? What's their full name?`
+                : `Who are you borrowing **${formatCurrencyRaw(a.amount)}** from? What's their full name?`,
         type: 'text',
         field: 'otherName',
         placeholder: 'Their full name',
-        validate: (v) => v.trim().length >= 2 ? null : 'Please enter their full name',
+        validate: (v) =>
+            v.trim().length >= 2 ? null : 'Please enter their full name',
     },
     {
         id: 'otherEmail',
         question: (a) =>
-            `What's **${firstName(a.otherName)}'s** email address? We'll send them an invitation to join Chipkie.`,
+            `What's **${firstName(a.otherName)}'s** email? ` +
+            `We'll send them an invite to join Chipkie.`,
         type: 'email',
         field: 'otherEmail',
         placeholder: 'them@example.com',
-        validate: (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? null : 'Please enter a valid email address',
+        validate: (v) =>
+            /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+                ? null
+                : 'Please enter a valid email address',
     },
     {
         id: 'frequency',
@@ -269,45 +345,64 @@ const STEPS = [
         field: 'frequency',
     },
     {
-        id: 'instalments',
-        question: (a) =>
-            `How many **${a.frequency.toLowerCase()}** repayments will there be in total?`,
-        type: 'number',
-        field: 'instalments',
-        placeholder: 'e.g. 12',
-        validate: (v) => (!isNaN(v) && parseInt(v) >= 1) ? null : 'Please enter a valid number of repayments (minimum 1)',
+        id: 'duration',
+        question: () =>
+            'How long should the loan run?\n' +
+            '*(e.g. **"6 months"**, **"1 year"**, **"18 months"**)*',
+        type: 'text',
+        field: 'duration',
+        placeholder: 'e.g. 6 months',
+        validate: (v) =>
+            parseDuration(v) !== null
+                ? null
+                : 'Please enter a duration like "3 months", "1 year" or "18 months"',
+        // Derive instalments from duration + frequency
+        onAnswer: (v, a) => {
+            a.instalments = String(durationToInstalments(v, a.frequency))
+        },
+    },
+    {
+        id: 'hasInterest',
+        // Shows repayment estimate (at 0% interest) and asks about interest
+        question: (a) => {
+            const n = parseInt(a.instalments)
+            const pmt = calcRepaymentAmount(parseFloat(a.amount), n, 0, a.frequency)
+            const freq = a.frequency.toLowerCase()
+            return (
+                `That's **${n} ${freq} repayment${n !== 1 ? 's' : ''}** of ` +
+                `**${formatCurrencyRaw(pmt.toFixed(2))}** each.\n\n` +
+                `Is there any interest on this loan?`
+            )
+        },
+        type: 'choice',
+        choices: ['Interest-free', 'Add interest'],
+        field: 'hasInterest',
+        onAnswer: (v, a) => {
+            if (v === 'Interest-free') a.interestRate = '0'
+        },
     },
     {
         id: 'interestRate',
-        question: () => "What's the annual interest rate? Enter **0** for interest-free.",
+        // Only shown if user chose "Add interest"
+        condition: (a) => a.hasInterest === 'Add interest',
+        question: (a) => {
+            const n = parseInt(a.instalments)
+            const freq = a.frequency.toLowerCase()
+            return (
+                `What's the annual interest rate? *(e.g. enter **5** for 5% p.a.)*\n\n` +
+                `I'll recalculate the ${n} ${freq} repayments once you confirm.`
+            )
+        },
         type: 'number',
         field: 'interestRate',
-        placeholder: '0',
-        validate: (v) => (!isNaN(v) && parseFloat(v) >= 0) ? null : 'Please enter 0 or a positive interest rate',
+        placeholder: 'e.g. 5',
+        validate: (v) =>
+            !isNaN(v) && parseFloat(v) >= 0 && parseFloat(v) <= 100
+                ? null
+                : 'Please enter a rate between 0 and 100',
+        displayValue: (v) => `${v}% p.a.`,
     },
 ]
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-function firstName(name) {
-    return (name || '').split(' ')[0]
-}
-
-function formatCurrencyRaw(val) {
-    if (!val) return '$0'
-    return '$' + Number(val).toLocaleString('en-AU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-}
-
-function formatCurrency(val) {
-    if (!val) return '—'
-    return '$' + Number(val).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function renderMarkdown(text) {
-    if (!text) return ''
-    return text
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n/g, '<br>')
-}
 
 // ─── State ────────────────────────────────────────────────────────────────────
 const messages = ref([])
@@ -330,24 +425,12 @@ const currentStep = computed(() => {
     return STEPS[currentStepIndex.value] ?? null
 })
 
-const inputType = computed(() => {
-    const t = currentStep.value?.type
-    if (t === 'email') return 'email'
-    return 'text'
-})
-
 const repaymentAmount = computed(() => {
     const P = parseFloat(answers.amount)
     const n = parseInt(answers.instalments)
-    const annualRate = parseFloat(answers.interestRate)
+    const annualRate = parseFloat(answers.interestRate ?? '0') || 0
     if (!P || !n) return 0
-    if (!annualRate || annualRate === 0) return (P / n).toFixed(2)
-
-    const periodsPerYear = answers.frequency === 'Weekly' ? 52
-        : answers.frequency === 'Fortnightly' ? 26 : 12
-    const r = annualRate / 100 / periodsPerYear
-    const payment = P * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1)
-    return payment.toFixed(2)
+    return calcRepaymentAmount(P, n, annualRate, answers.frequency)
 })
 
 // ─── Chat engine ──────────────────────────────────────────────────────────────
@@ -368,19 +451,28 @@ async function showBotMessage(text, delay = 700) {
 }
 
 async function advanceToStep(index) {
+    // Skip steps whose condition isn't satisfied
+    while (index < STEPS.length) {
+        const step = STEPS[index]
+        if (!step.condition || step.condition(answers)) break
+        index++
+    }
+
     if (index >= STEPS.length) {
         isDone.value = true
         showSummary.value = true
         await showBotMessage(
-            "Here's your loan summary. Everything look good?\n\nHit **Create Loan** to send an invitation to " +
-            `**${firstName(answers.otherName)}** and get things started!`
+            `Here's your loan summary — does everything look right?\n\n` +
+            `Hit **Create Loan** to send **${firstName(answers.otherName)}** their invite!`
         )
         return
     }
 
     currentStepIndex.value = index
     const step = STEPS[index]
-    const question = typeof step.question === 'function' ? step.question(answers) : step.question
+    const question = typeof step.question === 'function'
+        ? step.question(answers)
+        : step.question
     await showBotMessage(question)
 
     if (step.type !== 'choice') {
@@ -394,6 +486,7 @@ async function handleChoice(choice) {
     const step = currentStep.value
     if (!step) return
     answers[step.field] = choice
+    if (step.onAnswer) step.onAnswer(choice, answers)
     messages.value.push({ from: 'user', text: choice })
     inputValue.value = ''
     validationError.value = ''
@@ -421,11 +514,10 @@ async function handleTextSubmit() {
 
     validationError.value = ''
     answers[step.field] = value
+    if (step.onAnswer) step.onAnswer(value, answers)
 
-    const displayValue = step.type === 'currency'
-        ? formatCurrencyRaw(value)
-        : value
-    messages.value.push({ from: 'user', text: displayValue })
+    const display = step.displayValue ? step.displayValue(value) : value
+    messages.value.push({ from: 'user', text: display })
     inputValue.value = ''
     await scrollToBottom()
     await advanceToStep(currentStepIndex.value + 1)
@@ -436,21 +528,21 @@ async function submitLoan() {
     validationError.value = ''
     try {
         await axios.post('/loans/chat', {
-            role: answers.role,
-            amount: answers.amount,
-            your_name: answers.yourName,
-            your_email: answers.yourEmail,
-            other_name: answers.otherName,
-            other_email: answers.otherEmail,
-            frequency: answers.frequency,
-            instalments: answers.instalments,
+            role:          answers.role,
+            amount:        answers.amount,
+            your_name:     answers.yourName,
+            your_email:    answers.yourEmail,
+            other_name:    answers.otherName,
+            other_email:   answers.otherEmail,
+            frequency:     answers.frequency,
+            instalments:   answers.instalments,
             interest_rate: answers.interestRate,
         })
         isSubmitted.value = true
         await showBotMessage(
-            `Your loan has been created! 🎉\n\nWe've sent an invitation to **${firstName(answers.otherName)}** ` +
-            `at **${answers.otherEmail}**. Once they accept and join Chipkie, your loan will be fully active.\n\n` +
-            `Check your email for next steps.`,
+            `Your loan has been created!\n\n` +
+            `We've sent **${firstName(answers.otherName)}** an invite at **${answers.otherEmail}**. ` +
+            `Once they join Chipkie, your loan will be fully active.`,
             500
         )
     } catch (err) {
@@ -483,12 +575,6 @@ onMounted(() => {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-5px); }
 }
-
-.message-enter-active {
-    transition: all 0.3s ease-out;
-}
-.message-enter-from {
-    opacity: 0;
-    transform: translateY(8px);
-}
+.message-enter-active { transition: all 0.3s ease-out; }
+.message-enter-from { opacity: 0; transform: translateY(8px); }
 </style>
