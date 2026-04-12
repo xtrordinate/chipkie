@@ -383,16 +383,9 @@ const STEPS = [
     },
     {
         id: 'interestRate',
-        // Only shown if user chose "Add interest"
         condition: (a) => a.hasInterest === 'Add interest',
-        question: (a) => {
-            const n = parseInt(a.instalments)
-            const freq = a.frequency.toLowerCase()
-            return (
-                `What's the annual interest rate? *(e.g. enter **5** for 5% p.a.)*\n\n` +
-                `I'll recalculate the ${n} ${freq} repayments once you confirm.`
-            )
-        },
+        question: () =>
+            "What's the annual interest rate? *(e.g. enter **5** for 5% p.a.)*",
         type: 'number',
         field: 'interestRate',
         placeholder: 'e.g. 5',
@@ -401,6 +394,44 @@ const STEPS = [
                 ? null
                 : 'Please enter a rate between 0 and 100',
         displayValue: (v) => `${v}% p.a.`,
+    },
+    {
+        id: 'confirmInterest',
+        // Show the real cost of interest and ask for confirmation
+        condition: (a) => a.hasInterest === 'Add interest',
+        question: (a) => {
+            const n   = parseInt(a.instalments)
+            const P   = parseFloat(a.amount)
+            const rate = parseFloat(a.interestRate)
+            const freq = a.frequency
+            const period = freq === 'Weekly' ? 'week' : freq === 'Fortnightly' ? 'fortnight' : 'month'
+
+            const pmtFree = calcRepaymentAmount(P, n, 0, freq)
+            const pmtWith = calcRepaymentAmount(P, n, rate, freq)
+            const extraPerPeriod = pmtWith - pmtFree
+            const totalExtra     = extraPerPeriod * n
+
+            return (
+                `At **${rate}% p.a.**, each repayment goes from ` +
+                `**${formatCurrencyRaw(pmtFree.toFixed(2))}** → ` +
+                `**${formatCurrencyRaw(pmtWith.toFixed(2))}** — ` +
+                `**${formatCurrencyRaw(extraPerPeriod.toFixed(2))} more** per ${period}.\n\n` +
+                `Over the full term, **${firstName(a.otherName)}** would pay ` +
+                `**${formatCurrencyRaw(totalExtra.toFixed(2))} extra** in interest.\n\n` +
+                `Are you comfortable with that?`
+            )
+        },
+        type: 'choice',
+        choices: ['Yes, confirm', 'Change rate'],
+        field: 'confirmInterest',
+        // 'Change rate' jumps back to the interestRate step
+        next: (v) => v === 'Change rate' ? 'interestRate' : null,
+        onAnswer: (v, a) => {
+            if (v === 'Change rate') {
+                delete a.interestRate
+                delete a.confirmInterest
+            }
+        },
     },
 ]
 
@@ -481,6 +512,17 @@ async function advanceToStep(index) {
     }
 }
 
+function resolveNext(step, value) {
+    if (!step.next) return currentStepIndex.value + 1
+    const target = step.next(value)
+    if (target === null || target === undefined) return currentStepIndex.value + 1
+    if (typeof target === 'string') {
+        const idx = STEPS.findIndex(s => s.id === target)
+        return idx >= 0 ? idx : currentStepIndex.value + 1
+    }
+    return target
+}
+
 async function handleChoice(choice) {
     if (isTyping.value) return
     const step = currentStep.value
@@ -491,7 +533,7 @@ async function handleChoice(choice) {
     inputValue.value = ''
     validationError.value = ''
     await scrollToBottom()
-    await advanceToStep(currentStepIndex.value + 1)
+    await advanceToStep(resolveNext(step, choice))
 }
 
 async function handleTextSubmit() {
@@ -520,7 +562,7 @@ async function handleTextSubmit() {
     messages.value.push({ from: 'user', text: display })
     inputValue.value = ''
     await scrollToBottom()
-    await advanceToStep(currentStepIndex.value + 1)
+    await advanceToStep(resolveNext(step, value))
 }
 
 async function submitLoan() {
