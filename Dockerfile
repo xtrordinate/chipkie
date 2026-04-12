@@ -70,9 +70,13 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction --no-progre
 COPY docker/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
 
-# PHP-FPM: run as www-data, listen on 127.0.0.1:9000
+# PHP-FPM: run as www-data, forward worker errors to stderr
 RUN sed -i 's|^user = .*|user = www-data|' /usr/local/etc/php-fpm.d/www.conf \
-    && sed -i 's|^group = .*|group = www-data|' /usr/local/etc/php-fpm.d/www.conf
+    && sed -i 's|^group = .*|group = www-data|' /usr/local/etc/php-fpm.d/www.conf \
+    && echo "catch_workers_output = yes" >> /usr/local/etc/php-fpm.d/www.conf \
+    && echo "decorate_workers_output = no" >> /usr/local/etc/php-fpm.d/www.conf \
+    && echo "php_admin_value[error_log] = /proc/self/fd/2" >> /usr/local/etc/php-fpm.d/www.conf \
+    && echo "php_admin_flag[log_errors] = on" >> /usr/local/etc/php-fpm.d/www.conf
 
 # Startup script
 COPY docker/start.sh /start.sh

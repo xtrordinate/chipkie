@@ -1,6 +1,6 @@
 [deploy]
 startCommand = "/start.sh"
-healthcheckPath = "/loans/chat"
+healthcheckPath = "/health.php"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
 
