@@ -1,6 +1,6 @@
 <?php
 /**
- * Chipkie Localizer v4.7
+ * Chipkie Localizer v4.8
  * Standalone tool — no framework, no Composer.
  * Source always from AU subsite (/au).
  * Generates fresh, locale-native content for UK and US.
@@ -166,11 +166,13 @@ function build_prompt(string $locale): string {
           . '- Output only the article body — no meta-commentary, no document title, no disclaimer section.' . "\n"
           . '- Use valid HTML only. NEVER use markdown (no ##, no **, no *, no -- bullet dashes).' . "\n"
           . '- Wrap every paragraph in <p> tags.' . "\n"
-          . '- Section headings: use <h2> for main sections, <h3> for sub-sections.' . "\n"
+          . '- Section headings: use <h3> only. NEVER use <h1> or <h2> — these are reserved for the page title.' . "\n"
+          . '- Sub-section labels: use <strong> on its own line inside a <p> tag, not a heading tag.' . "\n"
           . '- Bullet lists: use <ul> and <li> tags.' . "\n"
           . '- Numbered lists: use <ol> and <li> tags.' . "\n"
           . '- Bold emphasis: use <strong>. Italic: use <em>.' . "\n"
-          . '- Do not add inline CSS, classes, or any other attributes to tags.'
+          . '- Do not add inline CSS, classes, or any other attributes to tags.' . "\n"
+          . '- Always write a complete conclusion paragraph. NEVER stop mid-sentence or mid-paragraph.'
           . "\n\n";
 
     if ($locale === 'uk') {
@@ -218,7 +220,7 @@ function gen_body(string $newTitle, string $sourceContent, string $locale): stri
             . 'Write a completely fresh, native article titled: "' . $newTitle . '"' . "\n"
             . 'Draw on your full expertise — include important concepts and nuances the reference may have missed. '
             . 'The goal is an article a professional adviser would be proud to have their name on.';
-    return claude_call($system, $user, 1500);
+    return claude_call($system, $user, 2000);
 }
 
 function gen_excerpt(string $title, string $body, string $locale): string {
@@ -419,7 +421,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chipkie Localizer v4.7</title>
+<title>Chipkie Localizer v4.8</title>
 <style>
 * { box-sizing: border-box; }
 body { font-family: system-ui, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; color: #222; }
