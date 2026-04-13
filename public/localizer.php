@@ -1,6 +1,6 @@
 <?php
 /**
- * Chipkie Localizer v4.5
+ * Chipkie Localizer v4.6
  * Standalone tool — no framework, no Composer.
  * Source always from AU subsite (/au).
  * Generates fresh, locale-native content for UK and US.
@@ -154,26 +154,41 @@ function claude_call(string $system, string $user, int $max_tokens): string {
 function build_prompt(string $locale): string {
     $label = SITES[$locale]['label'];
 
-    $base = 'You are an expert financial and legal content writer for ' . $label . '. '
-          . 'Write clear, accurate, engaging articles for a general audience. '
-          . 'Use natural ' . $label . ' English — vocabulary, spelling, and cultural context native to that country. '
-          . 'Do NOT translate or adapt the provided reference — write a completely fresh, native article. '
-          . 'Output only the article body — no meta-commentary, no title, no disclaimers. '
-          . 'Target word count: 700–1200 words. Use short paragraphs and plain language.'
+    $base = 'You are a senior financial and legal content writer specialising in personal finance for ' . $label . '. '
+          . 'Your articles are read by real people making consequential financial decisions — write with the authority of a professional adviser and the clarity of a trusted friend. '
+          . 'Use natural ' . $label . ' English: native vocabulary, correct spelling conventions, and culturally grounded examples. '
+          . 'Do NOT translate or adapt the reference material — write a completely fresh, native article. '
+          . 'Output only the article body — no meta-commentary, no title, no disclaimer section. '
+          . 'Target 800–1100 words. Prioritise depth and genuine insight over padding.' . "\n"
+          . 'TONE: Authoritative and direct — "tough love" where necessary. Do not soften hard financial and legal realities. '
+          . 'If something is genuinely risky or commonly misunderstood, say so plainly. Avoid toxic positivity.' . "\n"
+          . 'STRUCTURE: Lead with the most compelling reason to keep reading. Use clear subheadings. '
+          . 'End with the most actionable, concrete advice.'
           . "\n\n";
 
     if ($locale === 'uk') {
-        $expertise = 'EXPERTISE — apply your full knowledge:' . "\n"
-                   . '- UK legislation relevant to the topic (Limitation Act 1980, IHT Act 1984, Land Registration Act 2002, Law of Property Act 1925, Trusts of Land and Appointment of Trustees Act 1996, etc.)' . "\n"
-                   . '- Real distinctions that matter (e.g. deed vs contract = 12-year vs 6-year limitation period; hard vs soft debt; PET vs chargeable transfer; joint tenancy vs tenancy in common)' . "\n"
-                   . '- Practical UK-specific guidance: HMRC rules, Land Registry, conveyancing process, Stamp Duty Land Tax, Help to Buy, shared ownership' . "\n"
-                   . '- Do NOT limit yourself to what the reference covers — if you know important context the reference missed, include it';
+        $expertise = 'CRITICAL CONCEPTS — go deep where the topic demands it:' . "\n"
+                   . '- Joint and several liability: on a joint mortgage the lender can pursue EITHER borrower for 100% of the debt — not just their "share." This is the single most important fact most people get wrong.' . "\n"
+                   . '- Future mortgage capacity: lenders stress-test each borrower against the FULL mortgage debt when assessing future applications — a co-buyer wanting to move or buy a second property in a few years may find themselves unable to qualify.' . "\n"
+                   . '- Declaration of Trust / Deed of Trust: ESSENTIAL to document beneficial interest percentages, what happens on sale, and whether unequal contributions are loans or equity adjustments — without it, courts and HMRC default to equal shares regardless of actual contributions.' . "\n"
+                   . '- TOLATA 1996 (Trusts of Land and Appointment of Trustees Act): either co-owner can apply to court to force a sale even if the other refuses. A major litigation risk most articles overlook entirely.' . "\n"
+                   . '- SDLT surcharge: if EITHER co-buyer already owns property anywhere in the world, the 3% SDLT higher rate applies to the ENTIRE purchase price — even if the other buyer is a first-time buyer. This surprises most co-buyers at completion.' . "\n"
+                   . '- Deed vs contract limitation period: obligations executed as a deed carry a 12-year limitation period vs 6 years for a standard contract — use a deed for maximum enforceability of co-ownership terms.' . "\n"
+                   . '- Tenancy in common vs joint tenancy: TIC is almost always right for non-married co-buyers — unequal shares, independent inheritance rights, no forced survivorship.' . "\n"
+                   . '- Co-ownership agreement essentials: right of first refusal, buy-sell mechanism, exit timeline, shared expense account, occupancy rules, renovation consent thresholds.' . "\n"
+                   . '- HMRC/tax: CGT on sale (principal private residence relief only applies to the portion while it was the owner\'s main home); IHT implications if shares are gifted or held in trust.' . "\n"
+                   . '- Do NOT limit yourself to what the reference covers — include important context the reference missed where it genuinely serves the reader';
     } else {
-        $expertise = 'EXPERTISE — apply your full knowledge:' . "\n"
-                   . '- US federal and state laws relevant to the topic (statutes of limitation vary by state — note this where relevant; community property vs common law states)' . "\n"
-                   . '- Real distinctions that matter (e.g. written vs oral contracts, joint tenancy vs tenancy in common, deed of trust vs mortgage)' . "\n"
-                   . '- Practical US-specific guidance: IRS rules, title insurance, escrow, co-ownership agreements, estate planning, real estate attorney role' . "\n"
-                   . '- Do NOT limit yourself to what the reference covers — if you know important context the reference missed, include it';
+        $expertise = 'CRITICAL CONCEPTS — go deep where the topic demands it:' . "\n"
+                   . '- Joint and several liability: on a shared mortgage the lender can pursue EITHER borrower for 100% of the debt — not just their "share." This is the single most important fact most people get wrong.' . "\n"
+                   . '- DTI anchor effect: a co-signed mortgage counts 100% against each co-borrower\'s debt-to-income ratio for all future loan applications — even if the co-owner is the one making all the payments. Friend A wanting to buy a new home or investment property years later will be anchored by the original co-buy.' . "\n"
+                   . '- IRS Form 1098: the mortgage interest statement is issued under ONE Social Security Number. Co-owners must agree in writing on how to split the deduction — a common source of tax-season conflict. The primary borrower on the 1098 should ideally be the one who can use the deduction most effectively.' . "\n"
+                   . '- Community property states (CA, AZ, TX, NV, WA, ID, LA, NM, WI): if a co-buyer later marries, their spouse may acquire a community property interest in the home. The co-ownership agreement should include a "no-spouse-claim" clause; a prenuptial agreement covering the property may also be appropriate.' . "\n"
+                   . '- Tenants in Common vs Joint Tenancy: TIC is almost always right for friends — unequal ownership shares, independent inheritance rights, no forced survivorship.' . "\n"
+                   . '- Co-ownership agreement essentials: right of first refusal, buy-sell/shotgun clause (one names a price, the other must buy or sell at that price — incentivises fairness), exit timeline, shared expense account, occupancy rules, renovation consent thresholds.' . "\n"
+                   . '- State-by-state variation: statute of limitations on written contracts (4–10 years depending on state), deed of trust vs mortgage states, community vs common law property regimes — flag these differences where relevant.' . "\n"
+                   . '- Title insurance and escrow: explain their roles plainly — many first-time buyers don\'t understand what they\'re paying for.' . "\n"
+                   . '- Do NOT limit yourself to what the reference covers — include important context the reference missed where it genuinely serves the reader';
     }
 
     return $base . $expertise;
@@ -192,7 +207,10 @@ function gen_body(string $newTitle, string $sourceContent, string $locale): stri
     $system = build_prompt($locale);
     $user   = 'Reference material (for topic context only — do NOT copy or rewrite this):'
             . "\n\n" . $sourceContent
-            . "\n\n---\nNow write a completely fresh, native article titled: \"" . $newTitle . '"';
+            . "\n\n---\n"
+            . 'Write a completely fresh, native article titled: "' . $newTitle . '"' . "\n"
+            . 'Draw on your full expertise — include important concepts and nuances the reference may have missed. '
+            . 'The goal is an article a professional adviser would be proud to have their name on.';
     return claude_call($system, $user, 1500);
 }
 
@@ -432,7 +450,7 @@ button:disabled { opacity: .45; cursor: not-allowed; }
 <body>
 
 <div class="card">
-  <h1>Chipkie Localizer <small style="font-size:.7em;color:#888;font-weight:400">v4.5</small></h1>
+  <h1>Chipkie Localizer <small style="font-size:.7em;color:#888;font-weight:400">v4.6</small></h1>
 
   <?php if (TOOL_PASSWORD !== ''): ?>
   <div style="margin-bottom:12px">
