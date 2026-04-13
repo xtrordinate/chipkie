@@ -1,6 +1,6 @@
 <?php
 /**
- * Chipkie Localizer v4.8
+ * Chipkie Localizer v4.9
  * Standalone tool — no framework, no Composer.
  * Source always from AU subsite (/au).
  * Generates fresh, locale-native content for UK and US.
@@ -158,7 +158,7 @@ function build_prompt(string $locale): string {
           . 'Your articles are read by real people making consequential financial decisions — write with the authority of a professional adviser and the clarity of a trusted friend. '
           . 'Use natural ' . $label . ' English: native vocabulary, correct spelling conventions, and culturally grounded examples. '
           . 'Do NOT translate or adapt the reference material — write a completely fresh, native article. '
-          . 'Target 800–1100 words. Prioritise depth and genuine insight over padding.' . "\n"
+          . 'Target length: 900–1050 words. HARD LIMIT: Do not exceed 1050 words — plan your sections to fit within this budget. Fewer, well-developed sections are better than many shallow ones.' . "\n"
           . 'TONE: Authoritative and direct — "tough love" where necessary. Do not soften hard financial and legal realities. '
           . 'If something is genuinely risky or commonly misunderstood, say so plainly. Avoid toxic positivity.' . "\n"
           . 'STRUCTURE: Lead with the most compelling reason to keep reading. Use clear subheadings. End with the most actionable, concrete advice.' . "\n"
@@ -220,7 +220,24 @@ function gen_body(string $newTitle, string $sourceContent, string $locale): stri
             . 'Write a completely fresh, native article titled: "' . $newTitle . '"' . "\n"
             . 'Draw on your full expertise — include important concepts and nuances the reference may have missed. '
             . 'The goal is an article a professional adviser would be proud to have their name on.';
-    return claude_call($system, $user, 2000);
+    return claude_call($system, $user, 2500);
+}
+
+/**
+ * If Claude was cut off mid-tag, trim back to the last complete closing block tag.
+ * Prevents broken HTML reaching WordPress.
+ */
+function sanitize_body(string $html): string {
+    // Well-formed if it ends with a closing block element
+    if (preg_match('/<\/(p|ul|ol|h[1-6]|blockquote)>\s*$/s', $html)) {
+        return $html;
+    }
+    // Truncated — strip back to the last complete closing block tag
+    if (preg_match('/^(.*<\/(p|ul|ol|h[1-6]|blockquote)>)/s', $html, $m)) {
+        dlog('Truncation detected — trimmed to last complete block tag');
+        return $m[1];
+    }
+    return $html; // Couldn't fix — return as-is
 }
 
 function gen_excerpt(string $title, string $body, string $locale): string {
@@ -332,7 +349,7 @@ function do_localize(): array {
     $newTitle   = gen_title($source['title'], $locale);
     dlog("New title: $newTitle");
 
-    $newBody    = gen_body($newTitle, $source['content'], $locale);
+    $newBody    = sanitize_body(gen_body($newTitle, $source['content'], $locale));
     dlog("Body length: " . strlen($newBody));
 
     // Append locale-specific disclaimer
@@ -421,7 +438,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chipkie Localizer v4.8</title>
+<title>Chipkie Localizer v4.9</title>
 <style>
 * { box-sizing: border-box; }
 body { font-family: system-ui, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; color: #222; }
