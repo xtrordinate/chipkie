@@ -1,6 +1,6 @@
 <?php
 /**
- * Chipkie Localizer v4.6
+ * Chipkie Localizer v4.7
  * Standalone tool — no framework, no Composer.
  * Source always from AU subsite (/au).
  * Generates fresh, locale-native content for UK and US.
@@ -158,12 +158,19 @@ function build_prompt(string $locale): string {
           . 'Your articles are read by real people making consequential financial decisions — write with the authority of a professional adviser and the clarity of a trusted friend. '
           . 'Use natural ' . $label . ' English: native vocabulary, correct spelling conventions, and culturally grounded examples. '
           . 'Do NOT translate or adapt the reference material — write a completely fresh, native article. '
-          . 'Output only the article body — no meta-commentary, no title, no disclaimer section. '
           . 'Target 800–1100 words. Prioritise depth and genuine insight over padding.' . "\n"
           . 'TONE: Authoritative and direct — "tough love" where necessary. Do not soften hard financial and legal realities. '
           . 'If something is genuinely risky or commonly misunderstood, say so plainly. Avoid toxic positivity.' . "\n"
-          . 'STRUCTURE: Lead with the most compelling reason to keep reading. Use clear subheadings. '
-          . 'End with the most actionable, concrete advice.'
+          . 'STRUCTURE: Lead with the most compelling reason to keep reading. Use clear subheadings. End with the most actionable, concrete advice.' . "\n"
+          . 'OUTPUT FORMAT — follow exactly:' . "\n"
+          . '- Output only the article body — no meta-commentary, no document title, no disclaimer section.' . "\n"
+          . '- Use valid HTML only. NEVER use markdown (no ##, no **, no *, no -- bullet dashes).' . "\n"
+          . '- Wrap every paragraph in <p> tags.' . "\n"
+          . '- Section headings: use <h2> for main sections, <h3> for sub-sections.' . "\n"
+          . '- Bullet lists: use <ul> and <li> tags.' . "\n"
+          . '- Numbered lists: use <ol> and <li> tags.' . "\n"
+          . '- Bold emphasis: use <strong>. Italic: use <em>.' . "\n"
+          . '- Do not add inline CSS, classes, or any other attributes to tags.'
           . "\n\n";
 
     if ($locale === 'uk') {
@@ -412,7 +419,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action'])) {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Chipkie Localizer v4.6</title>
+<title>Chipkie Localizer v4.7</title>
 <style>
 * { box-sizing: border-box; }
 body { font-family: system-ui, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; color: #222; }
