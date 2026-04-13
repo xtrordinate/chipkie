@@ -11,6 +11,8 @@ class Loan extends Model
     use HasFactory;
 
     protected $fillable = [
+        'loan_name',
+        'loan_type',
         'stripe_id',
         'status',
         'plan',
@@ -18,6 +20,11 @@ class Loan extends Model
         'frequency',
         'instalments',
         'interest_rate',
+        'money_received',
+        'exchange_date',
+        'start_date',
+        'extra_signers',
+        'contract_add_on',
     ];
 
     public function stakeholders(): HasMany
