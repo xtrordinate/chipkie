@@ -124,40 +124,38 @@
                 </div>
             </div>
 
-            <!-- Password input — uncontrolled, no v-model, read value direct from DOM -->
-            <div v-else-if="currentStep && currentStep.type === 'password' && !isDone && !isSubmitted" class="space-y-2">
-                <div class="flex gap-2">
+            <!-- Summary + password setup: shown when chat is done -->
+            <div v-else-if="isDone && !isEarlyExit && !isSubmitted" class="space-y-3">
+                <div class="space-y-2">
+                    <p class="text-xs text-gray-400 px-1">Set your Chipkie password to create the loan</p>
                     <input
-                        ref="pwInputRef"
+                        v-model="pwSetup"
                         type="password"
-                        :placeholder="currentStep.placeholder"
-                        :disabled="isTyping"
+                        placeholder="Password (min 8 characters)"
                         autocomplete="new-password"
-                        @keydown.enter.prevent="handlePwSubmit"
-                        class="flex-1 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#007c89] focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
+                        class="w-full border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#007c89] focus:border-transparent"
                     />
+                    <input
+                        v-model="pwSetupConfirm"
+                        type="password"
+                        placeholder="Confirm password"
+                        autocomplete="new-password"
+                        class="w-full border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#007c89] focus:border-transparent"
+                    />
+                </div>
+                <div class="flex gap-2">
                     <button
                         type="button"
-                        :disabled="isTyping"
-                        @click="handlePwSubmit"
-                        class="w-10 h-10 bg-[#007c89] text-white rounded-full flex items-center justify-center hover:bg-[#004053] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
-                    >&#10148;</button>
+                        @click="startOver"
+                        class="flex-1 py-2.5 border border-gray-200 text-gray-500 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors"
+                    >Start over</button>
+                    <button
+                        type="button"
+                        :disabled="isSubmitting"
+                        @click="submitLoan"
+                        class="flex-1 py-2.5 bg-[#007c89] text-white rounded-full text-sm font-semibold hover:bg-[#004053] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >{{ isSubmitting ? 'Creating...' : 'Create Loan' }}</button>
                 </div>
-            </div>
-
-            <!-- Summary confirmed: Start over + Create Loan -->
-            <div v-else-if="isDone && !isEarlyExit && !isSubmitted" class="flex gap-2">
-                <button
-                    type="button"
-                    @click="startOver"
-                    class="flex-1 py-2.5 border border-gray-200 text-gray-500 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors"
-                >Start over</button>
-                <button
-                    type="button"
-                    :disabled="isSubmitting"
-                    @click="submitLoan"
-                    class="flex-1 py-2.5 bg-[#007c89] text-white rounded-full text-sm font-semibold hover:bg-[#004053] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                >{{ isSubmitting ? 'Creating...' : 'Create Loan' }}</button>
             </div>
 
             <!-- Early exit (terminal step): Start over only -->
@@ -534,25 +532,6 @@ const STEPS = [
         placeholder: 'e.g. +61 412 345 678',
         validate: (v) => v.trim().length >= 6 ? null : 'Please enter your phone number',
     },
-    {
-        id: 'yourPassword',
-        question: () =>
-            "Create a **password** for your Chipkie account. *(at least 8 characters)*",
-        type: 'password',
-        field: 'yourPassword',
-        placeholder: 'At least 8 characters',
-        validate: (v) => v.length >= 8 ? null : 'Password must be at least 8 characters',
-        displayValue: () => '••••••••',
-    },
-    {
-        id: 'yourPasswordConfirm',
-        question: () => "Please **confirm your password**.",
-        type: 'password',
-        field: 'yourPasswordConfirm',
-        placeholder: 'Re-enter your password',
-        validate: (v, a) => v !== a.yourPassword ? 'Passwords do not match' : null,
-        displayValue: () => '••••••••',
-    },
     // ── Other party details ───────────────────────────────────────────────────
     {
         id: 'otherFirstName',
@@ -704,7 +683,8 @@ const currentStepIndex = ref(0)
 
 const messagesContainer = ref(null)
 const inputRef = ref(null)
-const pwInputRef = ref(null)
+const pwSetup = ref('')
+const pwSetupConfirm = ref('')
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const currentStep = computed(() => {
@@ -832,9 +812,7 @@ async function advanceToStep(index) {
     }
 
     await showBotMessage(question)
-    if (step.type === 'password') {
-        pwInputRef.value?.focus()
-    } else if (step.type !== 'choice') {
+    if (step.type !== 'choice') {
         inputRef.value?.focus()
     }
 }
@@ -907,45 +885,6 @@ async function handleTextSubmit() {
     }
 }
 
-async function handlePwSubmit() {
-    if (isTyping.value) return
-    const step = currentStep.value
-    if (!step || step.type !== 'password') return
-
-    // Read directly from DOM — bypasses v-model and any browser extension interference
-    const value = String(pwInputRef.value?.value ?? '').trim()
-
-    if (step.validate) {
-        const err = step.validate(value, answers)
-        if (err) {
-            validationError.value = err
-            setTimeout(() => pwInputRef.value?.focus(), 0)
-            return
-        }
-    } else if (!value) {
-        validationError.value = 'Please enter a value'
-        setTimeout(() => pwInputRef.value?.focus(), 0)
-        return
-    }
-
-    validationError.value = ''
-    isTyping.value = true
-    // Clear the input immediately via DOM — no reactive update
-    if (pwInputRef.value) pwInputRef.value.value = ''
-    try {
-        answers[step.field] = value
-        if (step.onAnswer) step.onAnswer(value, answers)
-        const display = step.displayValue ? step.displayValue(value) : value
-        messages.value.push({ from: 'user', text: display })
-        await scrollToBottom()
-        await advanceToStep(resolveNext(step, value))
-    } catch (e) {
-        console.error('Chat error:', e)
-        isTyping.value = false
-        validationError.value = 'Something went wrong. Please try again.'
-    }
-}
-
 async function handleSkip() {
     if (isTyping.value) return
     const step = currentStep.value
@@ -959,8 +898,12 @@ async function handleSkip() {
 }
 
 async function submitLoan() {
-    isSubmitting.value = true
     validationError.value = ''
+    const pw = pwSetup.value.trim()
+    const pwc = pwSetupConfirm.value.trim()
+    if (pw.length < 8) { validationError.value = 'Password must be at least 8 characters'; return }
+    if (pw !== pwc) { validationError.value = 'Passwords do not match'; return }
+    isSubmitting.value = true
     try {
         const a = answers
         const planKey = a.plan === 'Free & Easy – Free' ? 'Free'
@@ -989,7 +932,7 @@ async function submitLoan() {
             your_state:          a.yourState,
             your_postcode:       a.yourPostcode,
             your_phone:          a.yourPhone,
-            your_password:       a.yourPassword,
+            your_password:       pw,
             other_first_name:    a.otherFirstName,
             other_last_name:     a.otherLastName,
             other_email:         a.otherEmail,
@@ -1025,7 +968,8 @@ function startOver() {
     messages.value = []
     Object.keys(answers).forEach(k => delete answers[k])
     inputValue.value = ''
-    if (pwInputRef.value) pwInputRef.value.value = ''
+    pwSetup.value = ''
+    pwSetupConfirm.value = ''
     validationError.value = ''
     isDone.value = false
     isEarlyExit.value = false
