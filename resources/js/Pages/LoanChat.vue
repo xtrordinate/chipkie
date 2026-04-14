@@ -92,8 +92,8 @@
                 >{{ choice }}</button>
             </div>
 
-            <!-- Text / email / password input -->
-            <div v-else-if="currentStep && !isDone && !isSubmitted" class="space-y-2">
+            <!-- Text / email / currency / number input (non-password) -->
+            <div v-else-if="currentStep && currentStep.type !== 'password' && !isDone && !isSubmitted" class="space-y-2">
                 <button
                     v-if="currentStep.optional"
                     type="button"
@@ -105,11 +105,11 @@
                     <input
                         ref="inputRef"
                         v-model="inputValue"
-                        :type="currentStep.type === 'password' ? 'password' : currentStep.type === 'email' ? 'email' : 'text'"
+                        :type="currentStep.type === 'email' ? 'email' : 'text'"
                         :inputmode="currentStep.type === 'currency' || currentStep.type === 'number' ? 'decimal' : undefined"
                         :placeholder="currentStep.placeholder"
                         :disabled="isTyping"
-                        :autocomplete="currentStep.type === 'password' ? 'new-password' : 'off'"
+                        autocomplete="off"
                         @keydown.enter.prevent="handleTextSubmit"
                         @keyup.enter="handleTextSubmit"
                         class="flex-1 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#007c89] focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
@@ -118,6 +118,29 @@
                         type="button"
                         :disabled="isTyping"
                         @click="handleTextSubmit"
+                        class="w-10 h-10 bg-[#007c89] text-white rounded-full flex items-center justify-center hover:bg-[#004053] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+                    >&#10148;</button>
+                </div>
+            </div>
+
+            <!-- Password input — completely separate element, never changes type -->
+            <div v-else-if="currentStep && currentStep.type === 'password' && !isDone && !isSubmitted" class="space-y-2">
+                <div class="flex gap-2">
+                    <input
+                        ref="pwInputRef"
+                        v-model="pwValue"
+                        type="password"
+                        :placeholder="currentStep.placeholder"
+                        :disabled="isTyping"
+                        autocomplete="new-password"
+                        @keydown.enter.prevent="handlePwSubmit"
+                        @keyup.enter="handlePwSubmit"
+                        class="flex-1 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#007c89] focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
+                    />
+                    <button
+                        type="button"
+                        :disabled="isTyping"
+                        @click="handlePwSubmit"
                         class="w-10 h-10 bg-[#007c89] text-white rounded-full flex items-center justify-center hover:bg-[#004053] transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-lg"
                     >&#10148;</button>
                 </div>
@@ -682,6 +705,8 @@ const currentStepIndex = ref(0)
 
 const messagesContainer = ref(null)
 const inputRef = ref(null)
+const pwInputRef = ref(null)
+const pwValue = ref('')
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const currentStep = computed(() => {
@@ -803,7 +828,9 @@ async function advanceToStep(index) {
     }
 
     await showBotMessage(question)
-    if (step.type !== 'choice') {
+    if (step.type === 'password') {
+        pwInputRef.value?.focus()
+    } else if (step.type !== 'choice') {
         inputRef.value?.focus()
     }
 }
@@ -862,6 +889,38 @@ async function handleTextSubmit() {
         const display = step.displayValue ? step.displayValue(value) : value
         messages.value.push({ from: 'user', text: display })
         inputValue.value = ''
+        await scrollToBottom()
+        await advanceToStep(resolveNext(step, value))
+    } catch (e) {
+        console.error('Chat error:', e)
+        isTyping.value = false
+        validationError.value = 'Something went wrong. Please try again.'
+    }
+}
+
+async function handlePwSubmit() {
+    if (isTyping.value) return
+    const step = currentStep.value
+    if (!step || step.type !== 'password') return
+
+    const value = String(pwValue.value ?? '').trim()
+
+    if (step.validate) {
+        const err = step.validate(value, answers)
+        if (err) { validationError.value = err; return }
+    } else if (!value) {
+        validationError.value = 'Please enter a value'
+        return
+    }
+
+    validationError.value = ''
+    isTyping.value = true
+    try {
+        answers[step.field] = value
+        if (step.onAnswer) step.onAnswer(value, answers)
+        const display = step.displayValue ? step.displayValue(value) : value
+        messages.value.push({ from: 'user', text: display })
+        pwValue.value = ''
         await scrollToBottom()
         await advanceToStep(resolveNext(step, value))
     } catch (e) {
@@ -950,6 +1009,7 @@ function startOver() {
     messages.value = []
     Object.keys(answers).forEach(k => delete answers[k])
     inputValue.value = ''
+    pwValue.value = ''
     validationError.value = ''
     isDone.value = false
     isEarlyExit.value = false
