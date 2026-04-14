@@ -134,7 +134,6 @@
                         :disabled="isTyping"
                         autocomplete="new-password"
                         @keydown.enter.prevent="handlePwSubmit"
-                        @keyup.enter="handlePwSubmit"
                         class="flex-1 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#007c89] focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
                     />
                     <button
@@ -875,9 +874,14 @@ async function handleTextSubmit() {
 
     if (step.validate) {
         const err = step.validate(value, answers)
-        if (err) { validationError.value = err; return }
+        if (err) {
+            validationError.value = err
+            setTimeout(() => inputRef.value?.focus(), 0)
+            return
+        }
     } else if (!value && !step.optional) {
         validationError.value = 'Please enter a value'
+        setTimeout(() => inputRef.value?.focus(), 0)
         return
     }
 
@@ -907,9 +911,14 @@ async function handlePwSubmit() {
 
     if (step.validate) {
         const err = step.validate(value, answers)
-        if (err) { validationError.value = err; return }
+        if (err) {
+            validationError.value = err
+            setTimeout(() => pwInputRef.value?.focus(), 0)
+            return
+        }
     } else if (!value) {
         validationError.value = 'Please enter a value'
+        setTimeout(() => pwInputRef.value?.focus(), 0)
         return
     }
 
