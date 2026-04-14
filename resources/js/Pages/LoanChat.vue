@@ -10,7 +10,7 @@
                 <h1 class="font-bold text-base leading-none">Chipkie</h1>
                 <p class="text-xs text-[#6dc4bc] mt-0.5">Loan Assistant</p>
             </div>
-            <div class="ml-auto text-[10px] text-[#6dc4bc] opacity-60 select-none">v6</div>
+            <div class="ml-auto text-[10px] text-[#6dc4bc] opacity-60 select-none">v7</div>
         </div>
 
         <!-- Messages area -->
@@ -243,6 +243,59 @@ function durationToInstalments(durationStr, frequency) {
     return Math.max(1, Math.round(totalWeeks / weeksPerPeriod))
 }
 
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+function parsedDate(v) {
+    const m = v?.trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+    if (!m) return null
+    const d = new Date(+m[3], +m[2] - 1, +m[1])
+    return (d.getFullYear() === +m[3] && d.getMonth() === +m[2] - 1 && d.getDate() === +m[1]) ? d : null
+}
+
+function today0() { const d = new Date(); d.setHours(0,0,0,0); return d }
+
+// ─── Country fuzzy-match ──────────────────────────────────────────────────────
+const COUNTRIES = [
+    'Afghanistan','Albania','Algeria','Argentina','Armenia','Australia','Austria',
+    'Azerbaijan','Bangladesh','Belarus','Belgium','Bolivia','Brazil','Bulgaria',
+    'Cambodia','Canada','Chile','China','Colombia','Croatia','Cuba',
+    'Czech Republic','Denmark','Dominican Republic','Ecuador','Egypt','Ethiopia',
+    'Finland','France','Germany','Ghana','Greece','Guatemala','Hungary','India',
+    'Indonesia','Iran','Iraq','Ireland','Israel','Italy','Jamaica','Japan',
+    'Jordan','Kazakhstan','Kenya','Kuwait','Lebanon','Libya','Lithuania',
+    'Malaysia','Mexico','Morocco','Myanmar','Nepal','Netherlands','New Zealand',
+    'Nigeria','Norway','Pakistan','Panama','Paraguay','Peru','Philippines',
+    'Poland','Portugal','Romania','Russia','Saudi Arabia','Serbia','Singapore',
+    'Slovakia','Slovenia','South Africa','South Korea','Spain','Sri Lanka',
+    'Sudan','Sweden','Switzerland','Syria','Taiwan','Tanzania','Thailand',
+    'Tunisia','Turkey','Uganda','Ukraine','United Arab Emirates',
+    'United Kingdom','United States','Uruguay','Uzbekistan','Venezuela',
+    'Vietnam','Yemen','Zimbabwe',
+]
+
+function levenshtein(a, b) {
+    const m = a.length, n = b.length
+    const dp = Array.from({length: m + 1}, (_, i) =>
+        Array.from({length: n + 1}, (_, j) => i === 0 ? j : j === 0 ? i : 0))
+    for (let i = 1; i <= m; i++)
+        for (let j = 1; j <= n; j++)
+            dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1]
+                : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1])
+    return dp[m][n]
+}
+
+function suggestCountry(input) {
+    const norm = input.toLowerCase().trim()
+    // Exact match (case-insensitive) — no suggestion needed
+    if (COUNTRIES.some(c => c.toLowerCase() === norm)) return null
+    let best = null, bestDist = Infinity
+    for (const c of COUNTRIES) {
+        const dist = levenshtein(norm, c.toLowerCase())
+        const threshold = c.length <= 5 ? 1 : c.length <= 9 ? 2 : 3
+        if (dist <= threshold && dist < bestDist) { bestDist = dist; best = c }
+    }
+    return best  // null if no close match
+}
+
 function calcRepaymentAmount(P, n, annualRate, frequency) {
     if (!P || !n) return 0
     if (!annualRate || annualRate === 0) return P / n
@@ -331,7 +384,12 @@ const STEPS = [
         type: 'text',
         field: 'exchangeDate',
         placeholder: 'e.g. 01/03/2026',
-        validate: (v) => isValidDate(v) ? null : 'Please enter a valid date in DD/MM/YYYY format',
+        validate: (v) => {
+            const d = parsedDate(v)
+            if (!d) return 'Please enter a valid date in DD/MM/YYYY format'
+            if (d > today0()) return 'Exchange date can\'t be in the future — money hasn\'t been exchanged yet!'
+            return null
+        },
     },
     {
         id: 'startDate',
@@ -339,7 +397,12 @@ const STEPS = [
         type: 'text',
         field: 'startDate',
         placeholder: 'e.g. 01/05/2026',
-        validate: (v) => isValidDate(v) ? null : 'Please enter a valid date in DD/MM/YYYY format',
+        validate: (v) => {
+            const d = parsedDate(v)
+            if (!d) return 'Please enter a valid date in DD/MM/YYYY format'
+            if (d < today0()) return 'Repayments can\'t start in the past — please enter today\'s date or a future date.'
+            return null
+        },
     },
     {
         id: 'frequency',
@@ -460,7 +523,12 @@ const STEPS = [
         type: 'text',
         field: 'yourDOB',
         placeholder: 'e.g. 15/06/1990',
-        validate: (v) => isValidDate(v) ? null : 'Please enter a valid date in DD/MM/YYYY format',
+        validate: (v) => {
+            const d = parsedDate(v)
+            if (!d) return 'Please enter a valid date in DD/MM/YYYY format'
+            if (d >= today0()) return 'Date of birth must be in the past'
+            return null
+        },
     },
     {
         id: 'yourCountry',
@@ -468,7 +536,26 @@ const STEPS = [
         type: 'text',
         field: 'yourCountry',
         placeholder: 'e.g. Australia, United Kingdom, USA',
-        validate: (v) => v.trim().length >= 2 ? null : 'Please enter your country',
+        validate: (v, a) => {
+            if (v.trim().length < 2) return 'Please enter your country'
+            const suggestion = suggestCountry(v)
+            if (suggestion) a._countrySuggestion = suggestion
+            return null
+        },
+        next: (v, a) => a._countrySuggestion ? 'yourCountrySuggest' : null,
+    },
+    {
+        id: 'yourCountrySuggest',
+        condition: (a) => !!a._countrySuggestion,
+        question: (a) => `I didn't quite recognise that — did you mean **${a._countrySuggestion}**?`,
+        type: 'choice',
+        choices: ['Yes, that\'s correct', 'No, let me re-enter'],
+        field: '_countrySuggestChoice',
+        onAnswer: (v, a) => {
+            if (v === 'Yes, that\'s correct') a.yourCountry = a._countrySuggestion
+            delete a._countrySuggestion
+        },
+        next: (v) => v === 'No, let me re-enter' ? 'yourCountry' : null,
     },
     {
         id: 'yourStreetAddress',
@@ -819,7 +906,7 @@ async function advanceToStep(index) {
 
 function resolveNext(step, value) {
     if (!step.next) return currentStepIndex.value + 1
-    const target = step.next(value)
+    const target = step.next(value, answers)
     if (target === null || target === undefined) return currentStepIndex.value + 1
     if (typeof target === 'string') {
         const idx = STEPS.findIndex(s => s.id === target)
