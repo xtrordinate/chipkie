@@ -110,7 +110,6 @@
                         :placeholder="currentStep.placeholder"
                         :disabled="isTyping"
                         @keydown.enter.prevent="handleTextSubmit"
-                        @keyup.enter.prevent="handleTextSubmit"
                         class="flex-1 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#007c89] focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
                     />
                     <button
@@ -792,6 +791,7 @@ async function handleChoice(choice) {
     if (isTyping.value) return
     const step = currentStep.value
     if (!step) return
+    isTyping.value = true
     if (step.field) answers[step.field] = choice
     if (step.onAnswer) step.onAnswer(choice, answers)
     messages.value.push({ from: 'user', text: choice })
@@ -817,6 +817,7 @@ async function handleTextSubmit() {
     }
 
     validationError.value = ''
+    isTyping.value = true
     answers[step.field] = value
     if (step.onAnswer) step.onAnswer(value, answers)
 
