@@ -10,6 +10,7 @@
                 <h1 class="font-bold text-base leading-none">Chipkie</h1>
                 <p class="text-xs text-[#6dc4bc] mt-0.5">Loan Assistant</p>
             </div>
+            <div class="ml-auto text-[10px] text-[#6dc4bc] opacity-60 select-none">v6</div>
         </div>
 
         <!-- Messages area -->
