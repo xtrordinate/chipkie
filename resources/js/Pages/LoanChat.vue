@@ -441,8 +441,21 @@ const STEPS = [
         validate: (v) => isValidDate(v) ? null : 'Please enter a valid date in DD/MM/YYYY format',
     },
     {
+        id: 'yourCountry',
+        question: () => 'What **country** are you based in?',
+        type: 'text',
+        field: 'yourCountry',
+        placeholder: 'e.g. Australia, United Kingdom, USA',
+        validate: (v) => v.trim().length >= 2 ? null : 'Please enter your country',
+    },
+    {
         id: 'yourStreetAddress',
-        question: () => "What's your **street address**?",
+        question: (a) => {
+            const isAU = /^aus/i.test(a.yourCountry || '') || /^au$/i.test(a.yourCountry || '')
+            return isAU
+                ? "What's your **street address**?"
+                : `What's your **street address** in ${a.yourCountry}?`
+        },
         type: 'text',
         field: 'yourStreetAddress',
         placeholder: 'e.g. 42 Main Street',
@@ -458,33 +471,43 @@ const STEPS = [
     },
     {
         id: 'yourSuburb',
-        question: () => 'What **suburb** are you in?',
+        question: () => 'What **city or suburb** are you in?',
         type: 'text',
         field: 'yourSuburb',
-        placeholder: 'e.g. Newtown',
-        validate: (v) => v.trim().length >= 2 ? null : 'Please enter your suburb',
+        placeholder: 'e.g. Newtown / London',
+        validate: (v) => v.trim().length >= 2 ? null : 'Please enter your city or suburb',
     },
     {
         id: 'yourState',
+        condition: (a) => /^aus/i.test(a.yourCountry || '') || /^au$/i.test(a.yourCountry || ''),
         question: () => 'Which **state or territory** are you in?',
         type: 'choice',
         choices: AU_STATES,
         field: 'yourState',
     },
     {
+        id: 'yourStateText',
+        condition: (a) => !/^aus/i.test(a.yourCountry || '') && !/^au$/i.test(a.yourCountry || ''),
+        question: () => 'What **state, province or region** are you in?',
+        type: 'text',
+        field: 'yourState',
+        placeholder: 'e.g. California / Ontario / England',
+        validate: (v) => v.trim().length >= 2 ? null : 'Please enter your state or region',
+    },
+    {
         id: 'yourPostcode',
-        question: () => "And your **postcode**?",
+        question: () => "What's your **postcode or ZIP code**?",
         type: 'text',
         field: 'yourPostcode',
-        placeholder: 'e.g. 2042',
-        validate: (v) => /^\d{4}$/.test(v.trim()) ? null : 'Please enter a valid 4-digit postcode',
+        placeholder: 'e.g. 2042 / 10001 / SW1A 1AA',
+        validate: (v) => v.trim().length >= 2 ? null : 'Please enter your postcode',
     },
     {
         id: 'yourPhone',
         question: () => "What's your **phone number**?",
         type: 'text',
         field: 'yourPhone',
-        placeholder: 'e.g. 0412 345 678',
+        placeholder: 'e.g. +61 412 345 678',
         validate: (v) => v.trim().length >= 6 ? null : 'Please enter your phone number',
     },
     {
@@ -549,10 +572,11 @@ const STEPS = [
     },
     {
         id: 'otherState',
-        question: (a) => `Which state or territory does **${a.otherFirstName}** live in?`,
-        type: 'choice',
-        choices: AU_STATES,
+        question: (a) => `What **state, territory or region** does **${a.otherFirstName}** live in?`,
+        type: 'text',
         field: 'otherState',
+        placeholder: 'e.g. NSW / California / England',
+        validate: (v) => v.trim().length >= 2 ? null : 'Please enter their state or region',
     },
     {
         id: 'otherPhone',
@@ -701,6 +725,7 @@ const summaryData = computed(() => {
                 { label: 'Name', value: [a.yourFirstName, a.yourLastName].filter(Boolean).join(' ') },
                 { label: 'Email', value: a.yourEmail },
                 { label: 'Date of birth', value: a.yourDOB },
+                { label: 'Country', value: a.yourCountry },
                 { label: 'Address', value: [a.yourStreetAddress, a.yourAddress2, a.yourSuburb, a.yourState, a.yourPostcode].filter(Boolean).join(', ') },
                 { label: 'Phone', value: a.yourPhone },
             ],
@@ -797,8 +822,14 @@ async function handleChoice(choice) {
     messages.value.push({ from: 'user', text: choice })
     inputValue.value = ''
     validationError.value = ''
-    await scrollToBottom()
-    await advanceToStep(resolveNext(step, choice))
+    try {
+        await scrollToBottom()
+        await advanceToStep(resolveNext(step, choice))
+    } catch (e) {
+        console.error('Chat error:', e)
+        isTyping.value = false
+        validationError.value = 'Something went wrong. Please try again.'
+    }
 }
 
 async function handleTextSubmit() {
@@ -824,8 +855,14 @@ async function handleTextSubmit() {
     const display = step.displayValue ? step.displayValue(value) : value
     messages.value.push({ from: 'user', text: display })
     inputValue.value = ''
-    await scrollToBottom()
-    await advanceToStep(resolveNext(step, value))
+    try {
+        await scrollToBottom()
+        await advanceToStep(resolveNext(step, value))
+    } catch (e) {
+        console.error('Chat error:', e)
+        isTyping.value = false
+        validationError.value = 'Something went wrong. Please try again.'
+    }
 }
 
 async function handleSkip() {
@@ -864,6 +901,7 @@ async function submitLoan() {
             your_last_name:      a.yourLastName,
             your_email:          a.yourEmail,
             your_dob:            parseDate(a.yourDOB),
+            your_country:        a.yourCountry,
             your_street_address: a.yourStreetAddress,
             your_address_2:      a.yourAddress2 || null,
             your_suburb:         a.yourSuburb,
