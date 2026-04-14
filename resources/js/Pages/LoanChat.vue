@@ -268,25 +268,25 @@ const STEPS = [
         field: 'role',
     },
     {
-        id: 'loanName',
-        question: (a) =>
-            `You're the **${a.role.toLowerCase()}**. What would you like to call this loan?\n\n` +
-            `*(e.g. "Sarah's car loan", "Holiday fund")*`,
-        type: 'text',
-        field: 'loanName',
-        placeholder: "e.g. Sarah's car loan",
-        validate: (v) => v.trim().length >= 2 ? null : 'Please enter a name for this loan',
-    },
-    {
         id: 'loanType',
-        question: () => 'What is this loan for?',
+        question: (a) => `You're the **${a.role.toLowerCase()}**. What is this loan for?`,
         type: 'choice',
         choices: LOAN_TYPES,
         field: 'loanType',
     },
     {
+        id: 'loanName',
+        question: (a) =>
+            `Got it — a **${a.loanType.toLowerCase()}** loan. What would you like to call it?\n\n` +
+            `*(e.g. "Sarah's car", "Holiday fund" — something you'll both recognise)*`,
+        type: 'text',
+        field: 'loanName',
+        placeholder: "e.g. Sarah's car",
+        validate: (v) => v.trim().length >= 2 ? null : 'Please enter a name for this loan',
+    },
+    {
         id: 'amount',
-        question: (a) => `Got it — a **${a.loanType.toLowerCase()}** loan. How much is the loan for?`,
+        question: () => 'How much is the loan for?',
         type: 'currency',
         field: 'amount',
         placeholder: 'e.g. 5000',
@@ -295,48 +295,10 @@ const STEPS = [
         displayValue: (v) => formatCurrencyRaw(v),
     },
     {
-        id: 'hasInterest',
-        question: (a) =>
-            `The loan is for **${formatCurrencyRaw(a.amount)}**.\n\nWill this loan have interest?`,
-        type: 'choice',
-        choices: ['Interest-free', 'Add interest'],
-        field: 'hasInterest',
-        onAnswer: (v, a) => { if (v === 'Interest-free') a.interestRate = '0' },
-    },
-    {
-        id: 'interestRate',
-        condition: (a) => a.hasInterest === 'Add interest',
-        question: () => "What's the annual interest rate? *(e.g. enter **5** for 5% p.a.)*",
-        type: 'number',
-        field: 'interestRate',
-        placeholder: 'e.g. 5',
-        validate: (v) =>
-            !isNaN(v) && parseFloat(v) >= 0 && parseFloat(v) <= 100
-                ? null : 'Please enter a rate between 0 and 100',
-        displayValue: (v) => `${v}% p.a.`,
-    },
-    {
-        id: 'confirmInterest',
-        condition: (a) => a.hasInterest === 'Add interest',
-        question: (a) => {
-            const rate = parseFloat(a.interestRate)
-            return (
-                `At **${rate}% p.a.**, interest will accrue on the outstanding balance each period.\n\n` +
-                `We'll calculate exact repayment amounts once we know the loan term.\n\n` +
-                `Are you happy to proceed with **${rate}% p.a.**?`
-            )
-        },
-        type: 'choice',
-        choices: ['Yes, confirm', 'Change rate'],
-        field: 'confirmInterest',
-        next: (v) => v === 'Change rate' ? 'interestRate' : null,
-        onAnswer: (v, a) => {
-            if (v === 'Change rate') { delete a.interestRate; delete a.confirmInterest }
-        },
-    },
-    {
         id: 'moneyReceived',
-        question: () => 'Has the money already been exchanged between both parties?',
+        question: (a) =>
+            `**${formatCurrencyRaw(a.amount)}** — got it.\n\n` +
+            `Has that money already been exchanged between both parties?`,
         type: 'choice',
         choices: ['Yes, already exchanged', 'Not yet'],
         field: 'moneyReceived',
@@ -387,17 +349,68 @@ const STEPS = [
             parseDuration(v) !== null ? null : 'Please enter a duration like "8 months" or "2 years"',
         onAnswer: (v, a) => { a.instalments = String(durationToInstalments(v, a.frequency)) },
     },
+    {
+        id: 'hasInterest',
+        question: (a) => {
+            const n = parseInt(a.instalments)
+            const freq = a.frequency.toLowerCase()
+            const pmt = calcRepaymentAmount(parseFloat(a.amount), n, 0, a.frequency)
+            return (
+                `Interest-free, that's **${n} ${freq} repayment${n !== 1 ? 's' : ''}** ` +
+                `of **${formatCurrency(pmt)}** each.\n\n` +
+                `Would you like to keep it interest-free, or add interest to this loan?`
+            )
+        },
+        type: 'choice',
+        choices: ['Keep it interest-free', 'Add interest'],
+        field: 'hasInterest',
+        onAnswer: (v, a) => { if (v === 'Keep it interest-free') a.interestRate = '0' },
+    },
+    {
+        id: 'interestRate',
+        condition: (a) => a.hasInterest === 'Add interest',
+        question: () => "What annual interest rate? *(e.g. enter **5** for 5% p.a.)*",
+        type: 'number',
+        field: 'interestRate',
+        placeholder: 'e.g. 5',
+        validate: (v) =>
+            !isNaN(v) && parseFloat(v) >= 0 && parseFloat(v) <= 100
+                ? null : 'Please enter a rate between 0 and 100',
+        displayValue: (v) => `${v}% p.a.`,
+    },
+    {
+        id: 'confirmInterest',
+        condition: (a) => a.hasInterest === 'Add interest',
+        question: (a) => {
+            const n = parseInt(a.instalments)
+            const P = parseFloat(a.amount)
+            const rate = parseFloat(a.interestRate)
+            const freq = a.frequency
+            const period = freq === 'Weekly' ? 'week' : freq === 'Fortnightly' ? 'fortnight' : 'month'
+            const pmtFree = calcRepaymentAmount(P, n, 0, freq)
+            const pmtWith = calcRepaymentAmount(P, n, rate, freq)
+            const extraPerPeriod = pmtWith - pmtFree
+            const totalExtra = extraPerPeriod * n
+            return (
+                `At **${rate}% p.a.**, each repayment increases from ` +
+                `**${formatCurrency(pmtFree)}** to **${formatCurrency(pmtWith)}** ` +
+                `— **${formatCurrency(extraPerPeriod)} more** per ${period}.\n\n` +
+                `Over the full term that's **${formatCurrency(totalExtra)} extra** paid in interest.\n\n` +
+                `Are you happy with that?`
+            )
+        },
+        type: 'choice',
+        choices: ['Yes, confirm', 'Change rate'],
+        field: 'confirmInterest',
+        next: (v) => v === 'Change rate' ? 'interestRate' : null,
+        onAnswer: (v, a) => {
+            if (v === 'Change rate') { delete a.interestRate; delete a.confirmInterest }
+        },
+    },
     // ── Your details ──────────────────────────────────────────────────────────
     {
         id: 'yourFirstName',
-        question: (a) => {
-            const n = parseInt(a.instalments)
-            const pmt = calcRepaymentAmount(parseFloat(a.amount), n, parseFloat(a.interestRate ?? '0') || 0, a.frequency)
-            return (
-                `That's **${n} ${a.frequency.toLowerCase()} repayment${n !== 1 ? 's' : ''}** ` +
-                `of **${formatCurrency(pmt)}** each.\n\nNow let's get your details. What's your **first name**?`
-            )
-        },
+        question: () => "Now let's get your details. What's your **first name**?",
         type: 'text',
         field: 'yourFirstName',
         placeholder: 'Your first name',
