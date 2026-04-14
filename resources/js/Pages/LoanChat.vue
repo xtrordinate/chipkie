@@ -67,29 +67,28 @@
             </div>
 
             <!-- Password + create loan (after Claude collects everything) -->
-            <div v-else-if="loanReady && !isSubmitted" class="space-y-2">
+            <form v-else-if="loanReady && !isSubmitted" class="space-y-2" @submit.prevent="submitLoan">
                 <p class="text-xs text-gray-400 px-1">Set your Chipkie password to create the loan</p>
                 <input
-                    v-model="pwSetup"
+                    ref="pwInput"
                     type="password"
                     placeholder="Password (min 8 characters)"
                     autocomplete="new-password"
                     class="w-full border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#007c89]"
                 />
                 <input
-                    v-model="pwSetupConfirm"
+                    ref="pwConfirmInput"
                     type="password"
                     placeholder="Confirm password"
                     autocomplete="new-password"
                     class="w-full border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#007c89]"
                 />
                 <button
-                    type="button"
+                    type="submit"
                     :disabled="isSubmitting"
-                    @click="submitLoan"
                     class="w-full py-2.5 bg-[#007c89] text-white rounded-full text-sm font-semibold hover:bg-[#004053] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >{{ isSubmitting ? 'Creating loan…' : 'Create Loan' }}</button>
-            </div>
+            </form>
 
             <!-- Post-submit -->
             <div v-else class="text-center py-1">
@@ -116,8 +115,8 @@ const loanReady = ref(false)
 const collectedData = ref(null)
 
 // Password + submission
-const pwSetup = ref('')
-const pwSetupConfirm = ref('')
+const pwInput = ref(null)
+const pwConfirmInput = ref(null)
 const isSubmitting = ref(false)
 const isSubmitted = ref(false)
 
@@ -172,8 +171,8 @@ async function sendMessage() {
 
 async function submitLoan() {
     error.value = ''
-    const pw = pwSetup.value
-    const pwc = pwSetupConfirm.value
+    const pw = pwInput.value?.value ?? ''
+    const pwc = pwConfirmInput.value?.value ?? ''
     if (pw.length < 8) { error.value = 'Password must be at least 8 characters'; return }
     if (pw !== pwc)    { error.value = 'Passwords do not match'; return }
 
