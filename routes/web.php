@@ -1,17 +1,12 @@
 <?php
 
+use App\Http\Controllers\LoanChatAIController;
 use App\Http\Controllers\LoanChatController;
 use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| Web Routes
-|--------------------------------------------------------------------------
-*/
+Route::get('/ping', fn () => response()->json(['ok' => true]));
 
-// Diagnostics (remove once /loans/chat is confirmed working)
-Route::get('/ping', fn () => response()->json(['ok' => true, 'session' => session()->getId()]));
-
-// Chat-based loan creation (unauthenticated entry point)
-Route::get('/loans/chat', [LoanChatController::class, 'show'])->name('loans.chat');
-Route::post('/loans/chat', [LoanChatController::class, 'store'])->name('loans.chat.store');
+// Chat-based loan creation
+Route::get('/loans/chat',         [LoanChatAIController::class, 'show'])->name('loans.chat');
+Route::post('/loans/chat/message',[LoanChatAIController::class, 'message'])->name('loans.chat.message');
+Route::post('/loans/chat',        [LoanChatController::class,   'store'])->name('loans.chat.store');
