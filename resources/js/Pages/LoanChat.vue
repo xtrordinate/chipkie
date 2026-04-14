@@ -123,12 +123,11 @@
                 </div>
             </div>
 
-            <!-- Password input — completely separate element, never changes type -->
+            <!-- Password input — uncontrolled, no v-model, read value direct from DOM -->
             <div v-else-if="currentStep && currentStep.type === 'password' && !isDone && !isSubmitted" class="space-y-2">
                 <div class="flex gap-2">
                     <input
                         ref="pwInputRef"
-                        v-model="pwValue"
                         type="password"
                         :placeholder="currentStep.placeholder"
                         :disabled="isTyping"
@@ -705,7 +704,6 @@ const currentStepIndex = ref(0)
 const messagesContainer = ref(null)
 const inputRef = ref(null)
 const pwInputRef = ref(null)
-const pwValue = ref('')
 
 // ─── Computed ─────────────────────────────────────────────────────────────────
 const currentStep = computed(() => {
@@ -791,11 +789,17 @@ function scrollToBottom() {
 
 async function showBotMessage(text, delay = 700) {
     isTyping.value = true
-    await scrollToBottom()
-    await new Promise(r => setTimeout(r, delay))
-    isTyping.value = false
-    messages.value.push({ from: 'bot', text })
-    await scrollToBottom()
+    // Safety net: never leave the typing indicator stuck for more than 5s
+    const watchdog = setTimeout(() => { isTyping.value = false }, 5000)
+    try {
+        await scrollToBottom()
+        await new Promise(r => setTimeout(r, delay))
+        isTyping.value = false
+        messages.value.push({ from: 'bot', text })
+        await scrollToBottom()
+    } finally {
+        clearTimeout(watchdog)
+    }
 }
 
 async function advanceToStep(index) {
@@ -907,7 +911,8 @@ async function handlePwSubmit() {
     const step = currentStep.value
     if (!step || step.type !== 'password') return
 
-    const value = String(pwValue.value ?? '').trim()
+    // Read directly from DOM — bypasses v-model and any browser extension interference
+    const value = String(pwInputRef.value?.value ?? '').trim()
 
     if (step.validate) {
         const err = step.validate(value, answers)
@@ -924,12 +929,13 @@ async function handlePwSubmit() {
 
     validationError.value = ''
     isTyping.value = true
+    // Clear the input immediately via DOM — no reactive update
+    if (pwInputRef.value) pwInputRef.value.value = ''
     try {
         answers[step.field] = value
         if (step.onAnswer) step.onAnswer(value, answers)
         const display = step.displayValue ? step.displayValue(value) : value
         messages.value.push({ from: 'user', text: display })
-        pwValue.value = ''
         await scrollToBottom()
         await advanceToStep(resolveNext(step, value))
     } catch (e) {
@@ -1018,7 +1024,7 @@ function startOver() {
     messages.value = []
     Object.keys(answers).forEach(k => delete answers[k])
     inputValue.value = ''
-    pwValue.value = ''
+    if (pwInputRef.value) pwInputRef.value.value = ''
     validationError.value = ''
     isDone.value = false
     isEarlyExit.value = false
