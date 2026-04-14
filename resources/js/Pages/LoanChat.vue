@@ -109,7 +109,9 @@
                         :inputmode="currentStep.type === 'currency' || currentStep.type === 'number' ? 'decimal' : undefined"
                         :placeholder="currentStep.placeholder"
                         :disabled="isTyping"
+                        :autocomplete="currentStep.type === 'password' ? 'new-password' : 'off'"
                         @keydown.enter.prevent="handleTextSubmit"
+                        @keyup.enter="handleTextSubmit"
                         class="flex-1 border border-gray-200 rounded-full px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#007c89] focus:border-transparent disabled:opacity-50 disabled:bg-gray-50"
                     />
                     <button
@@ -154,7 +156,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, nextTick, onMounted, defineComponent, h } from 'vue'
+import { ref, reactive, computed, onMounted, defineComponent, h } from 'vue'
 import axios from 'axios'
 
 // ─── SummaryRow sub-component ─────────────────────────────────────────────────
@@ -752,9 +754,15 @@ const summaryData = computed(() => {
 })
 
 // ─── Chat engine ──────────────────────────────────────────────────────────────
-async function scrollToBottom() {
-    await nextTick()
-    if (messagesContainer.value) messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+function scrollToBottom() {
+    // Use setTimeout(0) instead of nextTick() — avoids Vue scheduler deadlock
+    // that can occur when reactive state changes mid-flow (e.g. after password step)
+    return new Promise(resolve => setTimeout(() => {
+        if (messagesContainer.value) {
+            messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+        }
+        resolve()
+    }, 0))
 }
 
 async function showBotMessage(text, delay = 700) {
@@ -796,7 +804,6 @@ async function advanceToStep(index) {
 
     await showBotMessage(question)
     if (step.type !== 'choice') {
-        await nextTick()
         inputRef.value?.focus()
     }
 }
@@ -817,12 +824,12 @@ async function handleChoice(choice) {
     const step = currentStep.value
     if (!step) return
     isTyping.value = true
-    if (step.field) answers[step.field] = choice
-    if (step.onAnswer) step.onAnswer(choice, answers)
-    messages.value.push({ from: 'user', text: choice })
-    inputValue.value = ''
     validationError.value = ''
     try {
+        if (step.field) answers[step.field] = choice
+        if (step.onAnswer) step.onAnswer(choice, answers)
+        messages.value.push({ from: 'user', text: choice })
+        inputValue.value = ''
         await scrollToBottom()
         await advanceToStep(resolveNext(step, choice))
     } catch (e) {
@@ -849,13 +856,12 @@ async function handleTextSubmit() {
 
     validationError.value = ''
     isTyping.value = true
-    answers[step.field] = value
-    if (step.onAnswer) step.onAnswer(value, answers)
-
-    const display = step.displayValue ? step.displayValue(value) : value
-    messages.value.push({ from: 'user', text: display })
-    inputValue.value = ''
     try {
+        answers[step.field] = value
+        if (step.onAnswer) step.onAnswer(value, answers)
+        const display = step.displayValue ? step.displayValue(value) : value
+        messages.value.push({ from: 'user', text: display })
+        inputValue.value = ''
         await scrollToBottom()
         await advanceToStep(resolveNext(step, value))
     } catch (e) {
