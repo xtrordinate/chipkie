@@ -253,6 +253,7 @@ const STEPS = [
     {
         id: 'cancelled',
         type: 'terminal',
+        condition: (a) => a.ageDisclaimer === 'Cancel',
         question: () =>
             "No worries — if you change your mind, you're always welcome to come back. Take care!",
         field: null,
