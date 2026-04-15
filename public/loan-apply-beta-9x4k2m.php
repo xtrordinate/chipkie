@@ -18,11 +18,26 @@ if (isset($_GET['download'])) {
     exit;
 }
 
-require __DIR__ . '/../vendor/autoload.php';
-$app = require_once __DIR__ . '/../bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+// Read ANTHROPIC_API_KEY directly from .env — no full Laravel bootstrap needed for chat
+function loadEnvKey(string $key): string
+{
+    // Already in environment (e.g. Railway / Docker)
+    $val = getenv($key);
+    if ($val !== false && $val !== '') return $val;
 
-// ─── POST ?action=chat — proxy to Anthropic ───────────────────────────────────
+    // Parse .env manually
+    $envFile = __DIR__ . '/../.env';
+    if (!file_exists($envFile)) return '';
+    foreach (file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#' || strpos($line, '=') === false) continue;
+        [$k, $v] = explode('=', $line, 2);
+        if (trim($k) === $key) return trim($v, " \t\"'");
+    }
+    return '';
+}
+
+// ─── POST ?action=chat — proxy to Anthropic (no Laravel bootstrap) ────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'chat') {
     header('Content-Type: application/json');
 
@@ -33,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'chat')
         exit;
     }
 
-    $apiKey = config('services.anthropic.key');
+    $apiKey = loadEnvKey('ANTHROPIC_API_KEY');
     if (!$apiKey) {
         http_response_code(503);
         echo json_encode(['error' => 'ANTHROPIC_API_KEY is not configured in .env']);
@@ -75,7 +90,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'chat')
     exit;
 }
 
-// ─── POST ?action=create — create the loan via existing controller ─────────────
+// ─── POST ?action=create — bootstrap Laravel only here, create the loan ──────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'create') {
     header('Content-Type: application/json');
 
@@ -83,6 +98,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'create
     if (!is_array($data)) {
         http_response_code(400);
         echo json_encode(['message' => 'Invalid JSON body']);
+        exit;
+    }
+
+    // Bootstrap Laravel (only for this action)
+    try {
+        require __DIR__ . '/../vendor/autoload.php';
+        $app = require_once __DIR__ . '/../bootstrap/app.php';
+        $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        echo json_encode(['message' => 'App failed to boot: ' . $e->getMessage()]);
         exit;
     }
 
@@ -95,7 +121,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'create
     $request->headers->set('Content-Type', 'application/json');
     $request->headers->set('Accept', 'application/json');
 
-    // Register as the active request in the container
     $app->instance('request', $request);
     Illuminate\Support\Facades\Facade::clearResolvedInstance('request');
 
@@ -107,7 +132,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_GET['action'] ?? '') === 'create
     } catch (Illuminate\Validation\ValidationException $e) {
         http_response_code(422);
         echo json_encode(['message' => 'Validation failed.', 'errors' => $e->errors()]);
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
         http_response_code(500);
         echo json_encode(['message' => $e->getMessage()]);
     }
