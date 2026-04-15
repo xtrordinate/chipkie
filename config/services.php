@@ -24,4 +24,5 @@ return [
     'anthropic' => [
         'key' => env('ANTHROPIC_API_KEY'),
     ],
+    'loan_api_token' => env('LOAN_API_TOKEN'),
 ];
