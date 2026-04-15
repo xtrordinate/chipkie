@@ -9,6 +9,15 @@
  * - No changes needed to any other file on the server
  */
 
+// Self-download: visit ?download to save this file
+if (isset($_GET['download'])) {
+    header('Content-Type: application/octet-stream');
+    header('Content-Disposition: attachment; filename="loan-apply-beta-9x4k2m.php"');
+    header('Content-Length: ' . filesize(__FILE__));
+    readfile(__FILE__);
+    exit;
+}
+
 require __DIR__ . '/../vendor/autoload.php';
 $app = require_once __DIR__ . '/../bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
