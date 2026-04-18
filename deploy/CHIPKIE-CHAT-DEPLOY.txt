@@ -1,0 +1,112 @@
+====================================================================
+  CHIPKIE AI LOAN CHAT — DEPLOYMENT GUIDE
+  Hidden URL beta release for my.chipkie.com
+====================================================================
+
+ESTIMATED EFFORT: 20–30 minutes
+
+--------------------------------------------------------------------
+WHAT THIS DOES
+--------------------------------------------------------------------
+Adds a hidden AI-powered loan creation page to my.chipkie.com.
+When a user visits the URL, Claude (AI) guides them through a
+natural conversation to collect all loan details, then creates
+a real loan in the existing database — same as the current flow,
+just AI-driven instead of form-based.
+
+No existing pages or flows are changed. It runs alongside
+everything already on my.chipkie.com.
+
+--------------------------------------------------------------------
+FILES IN THIS PACKAGE
+--------------------------------------------------------------------
+  loan-apply-beta-9x4k2m.php   → upload to my.chipkie.com/public/
+  chipkie-variables.env         → values to add to my.chipkie.com/.env
+  CHIPKIE-CHAT-DEPLOY.txt       → this file
+
+--------------------------------------------------------------------
+STEP 1 — ADD ENVIRONMENT VARIABLE  (~5 mins)
+--------------------------------------------------------------------
+Open the .env file in the root of the my.chipkie.com Laravel app
+(one level above the public/ folder) and add the contents of
+chipkie-variables.env to the bottom.
+
+If the server uses a hosting panel (Plesk, cPanel) you can also
+set environment variables through the panel's PHP settings.
+
+--------------------------------------------------------------------
+STEP 2 — UPLOAD THE PHP FILE  (~5 mins)
+--------------------------------------------------------------------
+Upload loan-apply-beta-9x4k2m.php into the public/ directory of
+the my.chipkie.com Laravel app.
+
+The public/ folder is the web root. After upload the file should
+sit alongside index.php:
+
+  public/
+  ├── index.php
+  ├── loan-apply-beta-9x4k2m.php   ← here
+  └── ...
+
+--------------------------------------------------------------------
+STEP 3 — CLEAR CONFIG CACHE  (~2 mins)
+--------------------------------------------------------------------
+Run this artisan command on the server (SSH or Plesk terminal):
+
+  php artisan config:clear
+
+If opcache is enabled also run:
+
+  php artisan cache:clear
+
+--------------------------------------------------------------------
+STEP 4 — TEST  (~10 mins)
+--------------------------------------------------------------------
+Visit the hidden URL:
+
+  https://my.chipkie.com/loan-apply-beta-9x4k2m.php
+
+Run a test loan all the way through and confirm it appears in the
+database/dashboard.
+
+--------------------------------------------------------------------
+REQUIREMENTS CHECK
+--------------------------------------------------------------------
+The server must have:
+  ✓ PHP 8.1+                    (already required by Laravel)
+  ✓ PHP curl extension           (standard on most hosts — check
+                                  with: php -m | grep curl)
+  ✓ Laravel app already working  (yes — my.chipkie.com)
+  ✓ ANTHROPIC_API_KEY in .env    (added in Step 1)
+
+--------------------------------------------------------------------
+NO DATABASE CHANGES REQUIRED
+--------------------------------------------------------------------
+This uses the existing loans, users, instalments and loan_tokens
+tables. Nothing new needs to be created or migrated.
+
+--------------------------------------------------------------------
+MAKING IT THE MAIN FLOW (when ready)
+--------------------------------------------------------------------
+When testing is complete and you want to make this the default
+loan creation page, the full Laravel integration is in the repo
+at: https://github.com/xtrordinate/chipkie (branch: main)
+
+The changes are:
+  app/Http/Controllers/LoanChatAIController.php  (new file)
+  routes/web.php                                  (updated)
+  config/services.php                             (updated)
+  resources/js/Pages/LoanChat.vue                 (updated)
+
+That will require: composer install, npm run build, php artisan
+config:cache — estimated 1–2 hours including testing.
+
+--------------------------------------------------------------------
+QUESTIONS / SUPPORT
+--------------------------------------------------------------------
+The hidden URL contains a random token so regular users will not
+find it. Share only with internal testers.
+
+To download this file again at any time:
+  https://chipkie-production.up.railway.app/loan-apply-beta-9x4k2m.php?download
+====================================================================
