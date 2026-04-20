@@ -108,9 +108,24 @@ GUIDE;
 $tmp = tempnam(sys_get_temp_dir(), 'chipkie_');
 $zip = new ZipArchive();
 $zip->open($tmp, ZipArchive::CREATE | ZipArchive::OVERWRITE);
-$zip->addFile($phpFile, 'loan-apply-beta-9x4k2m.php');
-$zip->addFromString('chipkie-variables.env', $envContent);
-$zip->addFromString('CHIPKIE-CHAT-DEPLOY.txt', $guideContent);
+
+// Standalone upload file (for my.chipkie.com public/ folder)
+$zip->addFile(__DIR__ . '/loan-apply-beta-9x4k2m.php', 'standalone/loan-apply-beta-9x4k2m.php');
+$zip->addFromString('standalone/chipkie-variables.env', $envContent);
+$zip->addFromString('standalone/CHIPKIE-CHAT-DEPLOY.txt', $guideContent);
+
+// Full Sol1 repo integration files
+$deployDir = __DIR__ . '/../deploy';
+$zip->addFile($deployDir . '/LoanChatAIController.php',  'sol1-integration/app/Http/Controllers/LoanChatAIController.php');
+$zip->addFile($deployDir . '/LoanChat.vue',               'sol1-integration/resources/js/Pages/LoanChat.vue');
+$zip->addFile($deployDir . '/web.php',                    'sol1-integration/routes/web.php');
+$zip->addFile($deployDir . '/chipkie-ai-chat.patch',      'sol1-integration/chipkie-ai-chat.patch');
+$zip->addFile($deployDir . '/DEVELOPER-HANDOFF.txt',      'sol1-integration/DEVELOPER-HANDOFF.txt');
+$zip->addFromString('sol1-integration/config/services-addition.txt',
+    "Add this block inside the return [] array in config/services.php:\n\n" .
+    "    'anthropic' => [\n        'key' => env('ANTHROPIC_API_KEY'),\n    ],\n"
+);
+
 $zip->close();
 
 header('Content-Type: application/zip');

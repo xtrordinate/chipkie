@@ -1,0 +1,106 @@
+====================================================================
+  CHIPKIE AI LOAN CHAT — DEVELOPER HANDOFF
+  For applying to the Sol1 production repository
+====================================================================
+
+CONTEXT
+-------
+These changes were developed in the xtrordinate/chipkie fork (a clone
+of the Sol1 repo). They cannot be pulled directly — this guide gives
+you everything needed to apply the changes cleanly to the Sol1 repo.
+
+SUMMARY OF CHANGES
+------------------
+1 new file,  3 modified files,  1 new environment variable.
+No database migrations. No dependency changes. No schema changes.
+
+FILE CHANGES
+------------
+
+  NEW FILE (copy directly into Sol1 repo):
+    app/Http/Controllers/LoanChatAIController.php
+
+  MODIFIED FILES (options below):
+    routes/web.php
+    config/services.php
+    resources/js/Pages/LoanChat.vue   ← full rewrite, easiest to replace
+
+OPTION A — APPLY THE PATCH  (try this first)
+---------------------------------------------
+From the root of the Sol1 repo:
+
+  git apply chipkie-ai-chat.patch
+
+If it applies cleanly, skip to "Environment Variable" below.
+If there are conflicts, use Option B.
+
+OPTION B — MANUAL CHANGES  (if patch doesn't apply cleanly)
+------------------------------------------------------------
+
+1. COPY the new controller into place:
+   → app/Http/Controllers/LoanChatAIController.php
+   (file is included in this package — just copy it in)
+
+2. REPLACE routes/web.php with the version in this package.
+   Key additions are these routes at the bottom:
+
+     use App\Http\Controllers\LoanChatAIController;
+     use App\Http\Controllers\LoanChatController;
+
+     Route::get('/loans/chat',          [LoanChatAIController::class, 'show'])->name('loans.chat');
+     Route::post('/loans/chat/message', [LoanChatAIController::class, 'message'])->name('loans.chat.message');
+     Route::post('/loans/chat',         [LoanChatController::class,   'store'])->name('loans.chat.store');
+     Route::get('/apply-beta-9x4k2m',   [LoanChatAIController::class, 'show']);
+
+3. ADD to config/services.php (inside the return array):
+
+     'anthropic' => [
+         'key' => env('ANTHROPIC_API_KEY'),
+     ],
+
+4. REPLACE resources/js/Pages/LoanChat.vue with the version
+   in this package (it's a full rewrite — easier to replace than diff).
+
+ENVIRONMENT VARIABLE
+--------------------
+Add to the production environment (container secrets / .env):
+
+  ANTHROPIC_API_KEY=sk-ant-YOUR-KEY-HERE
+
+Get the key from: https://console.anthropic.com/
+
+BUILD STEP
+----------
+After applying changes, the pipeline's normal build handles everything:
+
+  composer install        (no new PHP packages)
+  npm run build           (recompiles LoanChat.vue)
+  php artisan config:cache
+
+TESTING
+-------
+Staging first, then production.
+
+Hidden test URL (not linked from anywhere):
+  https://[domain]/apply-beta-9x4k2m
+
+Main loan chat URL:
+  https://[domain]/loans/chat
+
+WHAT IT DOES
+------------
+Replaces the hardcoded step-by-step loan form with a Claude AI
+conversation. The AI collects all required fields naturally, presents
+a summary, then calls the existing LoanChatController::store to create
+the loan — same database writes, same invite emails, nothing else changes.
+
+SCOPE
+-----
+  ✓ No new database tables or migrations
+  ✓ No new Composer packages
+  ✓ No infrastructure changes
+  ✓ Existing loan creation logic (LoanChatController) unchanged
+  ✓ All other pages/flows unaffected
+
+EFFORT ESTIMATE: 1–2 hours including staging test
+====================================================================
